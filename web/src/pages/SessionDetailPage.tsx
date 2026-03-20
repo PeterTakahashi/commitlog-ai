@@ -96,6 +96,14 @@ export function SessionDetailPage() {
               {commitHash.slice(0, 7)}
             </code>
           )}
+          {(msgStart != null || msgEnd != null) && (
+            <Link
+              to={`/session/${id}/full`}
+              className="text-xs text-primary hover:text-primary/80 transition-colors ml-2"
+            >
+              View full session &rarr;
+            </Link>
+          )}
         </div>
         <div className="text-xs text-muted-foreground font-mono shrink-0">
           {new Date(session.started_at).toLocaleString()}

@@ -121,6 +121,15 @@ function TimelineEntryRow({ entry }: { entry: TimelineEntry }) {
                   ({entry.message_end_idx - entry.message_start_idx} msgs)
                 </span>
               )}
+            {session && (
+              <Link
+                to={`/session/${session.id}/full`}
+                onClick={(e) => e.stopPropagation()}
+                className="text-xs text-primary/60 hover:text-primary transition-colors"
+              >
+                full
+              </Link>
+            )}
           </div>
         )}
 

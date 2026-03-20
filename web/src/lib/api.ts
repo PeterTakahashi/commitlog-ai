@@ -35,6 +35,28 @@ export async function fetchSession(
   return res.json();
 }
 
+export interface CommitWithDiff {
+  hash: string;
+  author: string;
+  author_email: string;
+  message: string;
+  timestamp: string;
+  files_changed: number;
+  additions: number;
+  deletions: number;
+  changed_files?: string[];
+  diff: string;
+}
+
+export async function fetchSessionCommits(
+  sessionId: string,
+): Promise<CommitWithDiff[]> {
+  const res = await fetch(`${BASE}/sessions-commits/${sessionId}`);
+  if (!res.ok)
+    throw new Error(`Failed to fetch session commits: ${res.statusText}`);
+  return res.json();
+}
+
 export async function fetchDiff(hash: string): Promise<string> {
   const res = await fetch(`${BASE}/commits/${hash}/diff`);
   if (!res.ok) throw new Error(`Failed to fetch diff: ${res.statusText}`);

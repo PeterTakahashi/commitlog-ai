@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { TimelinePage } from "@/pages/TimelinePage";
 import { SessionDetailPage } from "@/pages/SessionDetailPage";
+import { SessionFullPage } from "@/pages/SessionFullPage";
 import { StatsPage } from "@/pages/StatsPage";
 
 export default function App() {
@@ -14,6 +15,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<TimelinePage />} />
           <Route path="/session/:id" element={<SessionDetailPage />} />
+          <Route path="/session/:id/full" element={<SessionFullPage />} />
           <Route path="/stats" element={<StatsPage />} />
         </Routes>
       </TooltipProvider>

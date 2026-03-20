@@ -78,6 +78,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/timeline", s.handleTimeline)
 	mux.HandleFunc("/api/sessions/", s.handleSession)
 	mux.HandleFunc("/api/commits/", s.handleCommitDiff)
+	mux.HandleFunc("/api/sessions-commits/", s.handleSessionCommits)
 	mux.HandleFunc("/api/stats", s.handleStats)
 	mux.HandleFunc("/api/avatar", s.handleAvatar)
 
@@ -265,6 +266,38 @@ func (s *Server) handleCommitDiff(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, map[string]string{"diff": diff})
+}
+
+func (s *Server) handleSessionCommits(w http.ResponseWriter, r *http.Request) {
+	// /api/sessions-commits/{id} → all commits linked to this session with diffs
+	id := strings.TrimPrefix(r.URL.Path, "/api/sessions-commits/")
+	if id == "" {
+		http.Error(w, "session ID required", http.StatusBadRequest)
+		return
+	}
+
+	type commitWithDiff struct {
+		model.GitCommit
+		Diff string `json:"diff"`
+	}
+
+	var results []commitWithDiff
+	seen := make(map[string]bool)
+	for _, entry := range s.timeline.Entries {
+		if entry.Session != nil && entry.Session.ID == id && entry.Commit != nil {
+			if seen[entry.Commit.Hash] {
+				continue
+			}
+			seen[entry.Commit.Hash] = true
+			diff, _ := s.gitClient.GetDiff(entry.Commit.Hash)
+			results = append(results, commitWithDiff{
+				GitCommit: *entry.Commit,
+				Diff:      diff,
+			})
+		}
+	}
+
+	writeJSON(w, results)
 }
 
 func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
