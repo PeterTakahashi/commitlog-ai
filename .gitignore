@@ -1,0 +1,17 @@
+# Build artifacts
+bin/
+aitrace
+*.exe
+
+# Parsed data (may contain secrets from agent logs)
+.aitrace/
+
+# Embedded SPA dist (built from web/)
+internal/server/dist/
+
+# Web dependencies & build
+web/node_modules/
+web/dist/
+
+# OS files
+.DS_Store
