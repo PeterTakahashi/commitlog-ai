@@ -16,7 +16,5 @@ type Parser interface {
 func AllParsers() []Parser {
 	return []Parser{
 		&ClaudeParser{},
-		&GeminiParser{},
-		&CodexParser{},
 	}
 }
