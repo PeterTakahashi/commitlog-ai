@@ -4,10 +4,25 @@ import { fetchStats } from "@/lib/api";
 import type { Stats } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-const AGENT_LABELS: Record<string, { label: string; color: string }> = {
-  claude_code: { label: "Claude", color: "bg-orange-500" },
-  gemini_cli: { label: "Gemini", color: "bg-blue-500" },
-  codex_cli: { label: "Codex", color: "bg-green-500" },
+const AGENT_LABELS: Record<
+  string,
+  { label: string; icon: string; color: string }
+> = {
+  claude_code: {
+    label: "Claude",
+    icon: "/icons/claude.svg",
+    color: "bg-orange-500",
+  },
+  gemini_cli: {
+    label: "Gemini",
+    icon: "/icons/gemini.svg",
+    color: "bg-blue-500",
+  },
+  codex_cli: {
+    label: "Codex",
+    icon: "/icons/codex.svg",
+    color: "bg-green-500",
+  },
 };
 
 export function StatsPage() {
@@ -68,13 +83,23 @@ export function StatsPage() {
           {Object.entries(stats.by_agent).map(([agent, count]) => {
             const config = AGENT_LABELS[agent] ?? {
               label: agent,
+              icon: "",
               color: "bg-zinc-500",
             };
             const pct = totalByAgent > 0 ? (count / totalByAgent) * 100 : 0;
             return (
               <div key={agent} className="space-y-1">
                 <div className="flex justify-between text-sm">
-                  <span>{config.label}</span>
+                  <span className="flex items-center gap-2">
+                    {config.icon && (
+                      <img
+                        src={config.icon}
+                        alt={config.label}
+                        className="w-4 h-4"
+                      />
+                    )}
+                    {config.label}
+                  </span>
                   <span className="font-mono text-muted-foreground">
                     {count} ({Math.round(pct)}%)
                   </span>
@@ -90,6 +115,152 @@ export function StatsPage() {
           })}
         </CardContent>
       </Card>
+
+      {/* Diff by Agent */}
+      {stats.diff_by_agent && Object.keys(stats.diff_by_agent).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-mono">Diff by Agent</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {(() => {
+              const entries = Object.entries(stats.diff_by_agent);
+              const maxLines = Math.max(
+                ...entries.map(([, d]) => d.additions + d.deletions),
+                1,
+              );
+              return entries.map(([agent, diff]) => {
+                const config = AGENT_LABELS[agent] ?? {
+                  label: agent,
+                  icon: "",
+                  color: "bg-zinc-500",
+                };
+                const total = diff.additions + diff.deletions;
+                const addPct =
+                  maxLines > 0 ? (diff.additions / maxLines) * 100 : 0;
+                const delPct =
+                  maxLines > 0 ? (diff.deletions / maxLines) * 100 : 0;
+                return (
+                  <div key={agent} className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="flex items-center gap-2">
+                        {config.icon && (
+                          <img
+                            src={config.icon}
+                            alt={config.label}
+                            className="w-4 h-4"
+                          />
+                        )}
+                        {config.label}
+                      </span>
+                      <span className="font-mono text-muted-foreground text-xs">
+                        {diff.commits} commit{diff.commits !== 1 ? "s" : ""} /{" "}
+                        {diff.files_changed} file
+                        {diff.files_changed !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                    <div className="flex h-3 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full bg-green-500"
+                        style={{ width: `${addPct}%` }}
+                      />
+                      <div
+                        className="h-full bg-red-500"
+                        style={{ width: `${delPct}%` }}
+                      />
+                    </div>
+                    <div className="flex gap-4 text-xs font-mono">
+                      <span className="text-green-500">
+                        +{diff.additions.toLocaleString()}
+                      </span>
+                      <span className="text-red-500">
+                        -{diff.deletions.toLocaleString()}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {total.toLocaleString()} total
+                      </span>
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Tokens by Agent */}
+      {stats.token_by_agent && Object.keys(stats.token_by_agent).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-mono">Tokens by Agent</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {(() => {
+              const entries = Object.entries(stats.token_by_agent);
+              const maxTokens = Math.max(
+                ...entries.map(([, t]) => t.input_tokens + t.output_tokens),
+                1,
+              );
+              return entries.map(([agent, tok]) => {
+                const config = AGENT_LABELS[agent] ?? {
+                  label: agent,
+                  icon: "",
+                  color: "bg-zinc-500",
+                };
+                const total = tok.input_tokens + tok.output_tokens;
+                const inPct =
+                  maxTokens > 0 ? (tok.input_tokens / maxTokens) * 100 : 0;
+                const outPct =
+                  maxTokens > 0 ? (tok.output_tokens / maxTokens) * 100 : 0;
+                const cacheTokens =
+                  tok.cache_read_input_tokens + tok.cache_creation_input_tokens;
+                return (
+                  <div key={agent} className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="flex items-center gap-2">
+                        {config.icon && (
+                          <img
+                            src={config.icon}
+                            alt={config.label}
+                            className="w-4 h-4"
+                          />
+                        )}
+                        {config.label}
+                      </span>
+                      <span className="font-mono text-muted-foreground text-xs">
+                        {total.toLocaleString()} tokens
+                      </span>
+                    </div>
+                    <div className="flex h-3 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full bg-blue-500"
+                        style={{ width: `${inPct}%` }}
+                      />
+                      <div
+                        className="h-full bg-amber-500"
+                        style={{ width: `${outPct}%` }}
+                      />
+                    </div>
+                    <div className="flex gap-4 text-xs font-mono">
+                      <span className="text-blue-500">
+                        in: {tok.input_tokens.toLocaleString()}
+                      </span>
+                      <span className="text-amber-500">
+                        out: {tok.output_tokens.toLocaleString()}
+                      </span>
+                      {cacheTokens > 0 && (
+                        <span className="text-muted-foreground">
+                          cache: {cacheTokens.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Link breakdown */}
       <Card>

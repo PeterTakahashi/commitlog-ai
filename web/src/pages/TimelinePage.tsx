@@ -7,10 +7,10 @@ import { Link } from "react-router-dom";
 const PAGE_SIZE = 50;
 
 const AGENT_FILTERS = [
-  { value: "", label: "All" },
-  { value: "claude_code", label: "Claude" },
-  { value: "gemini_cli", label: "Gemini" },
-  { value: "codex_cli", label: "Codex" },
+  { value: "", label: "All", icon: "" },
+  { value: "claude_code", label: "Claude", icon: "/icons/claude.svg" },
+  { value: "gemini_cli", label: "Gemini", icon: "/icons/gemini.svg" },
+  { value: "codex_cli", label: "Codex", icon: "/icons/codex.svg" },
 ];
 
 export function TimelinePage() {
@@ -138,12 +138,13 @@ export function TimelinePage() {
             <button
               key={f.value}
               onClick={() => setAgent(f.value)}
-              className={`block w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${
+              className={`flex items-center gap-2 w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${
                 agent === f.value
                   ? "bg-primary text-primary-foreground"
                   : "hover:bg-muted text-foreground"
               }`}
             >
+              {f.icon && <img src={f.icon} alt={f.label} className="w-4 h-4" />}
               {f.label}
             </button>
           ))}

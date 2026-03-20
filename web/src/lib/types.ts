@@ -70,11 +70,27 @@ export interface PaginatedTimeline {
   has_more: boolean;
 }
 
+export interface DiffStat {
+  additions: number;
+  deletions: number;
+  files_changed: number;
+  commits: number;
+}
+
+export interface TokenStat {
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation_input_tokens: number;
+  cache_read_input_tokens: number;
+}
+
 export interface Stats {
   total_entries: number;
   total_sessions: number;
   total_messages: number;
   by_agent: Record<string, number>;
+  diff_by_agent: Record<string, DiffStat>;
+  token_by_agent: Record<string, TokenStat>;
   linked: number;
   commit_only: number;
   session_only: number;

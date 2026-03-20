@@ -330,23 +330,66 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		"total_sessions": len(s.sessions),
 	}
 
-	// Count by agent
+	// Count by agent + token usage
 	agentCounts := make(map[string]int)
 	totalMessages := 0
+	type tokenStat struct {
+		InputTokens              int `json:"input_tokens"`
+		OutputTokens             int `json:"output_tokens"`
+		CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+		CacheReadInputTokens     int `json:"cache_read_input_tokens"`
+	}
+	tokenByAgent := make(map[string]*tokenStat)
 	for _, session := range s.sessions {
-		agentCounts[session.Agent.Tool]++
+		agent := session.Agent.Tool
+		agentCounts[agent]++
 		totalMessages += len(session.Messages)
+		ts, ok := tokenByAgent[agent]
+		if !ok {
+			ts = &tokenStat{}
+			tokenByAgent[agent] = ts
+		}
+		for _, msg := range session.Messages {
+			if msg.Usage != nil {
+				ts.InputTokens += msg.Usage.InputTokens
+				ts.OutputTokens += msg.Usage.OutputTokens
+				ts.CacheCreationInputTokens += msg.Usage.CacheCreationInputTokens
+				ts.CacheReadInputTokens += msg.Usage.CacheReadInputTokens
+			}
+		}
 	}
 	stats["by_agent"] = agentCounts
 	stats["total_messages"] = totalMessages
+	stats["token_by_agent"] = tokenByAgent
 
-	// Count linked vs unlinked
+	// Count linked vs unlinked + diff stats per agent
 	linked := 0
 	commitOnly := 0
 	sessionOnly := 0
+	type diffStat struct {
+		Additions    int `json:"additions"`
+		Deletions    int `json:"deletions"`
+		FilesChanged int `json:"files_changed"`
+		Commits      int `json:"commits"`
+	}
+	diffByAgent := make(map[string]*diffStat)
+	seenCommits := make(map[string]string) // hash -> agent (avoid double-counting)
 	for _, e := range s.timeline.Entries {
 		if e.Commit != nil && e.Session != nil {
 			linked++
+			agent := e.Session.Agent.Tool
+			if _, ok := seenCommits[e.Commit.Hash]; !ok {
+				seenCommits[e.Commit.Hash] = agent
+				ds, ok := diffByAgent[agent]
+				if !ok {
+					ds = &diffStat{}
+					diffByAgent[agent] = ds
+				}
+				ds.Additions += e.Commit.Additions
+				ds.Deletions += e.Commit.Deletions
+				ds.FilesChanged += e.Commit.FilesChanged
+				ds.Commits++
+			}
 		} else if e.Commit != nil {
 			commitOnly++
 		} else {
@@ -356,6 +399,7 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	stats["linked"] = linked
 	stats["commit_only"] = commitOnly
 	stats["session_only"] = sessionOnly
+	stats["diff_by_agent"] = diffByAgent
 
 	writeJSON(w, stats)
 }
