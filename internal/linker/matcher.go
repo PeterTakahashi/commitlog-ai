@@ -56,13 +56,15 @@ func Match(sessions []model.Session, commits []model.GitCommit) model.LinkedTime
 			// Single commit: link entire session
 			c := *matchedCommits[0].commit
 			s := *session
-			entries = append(entries, model.TimelineEntry{
+			entry := model.TimelineEntry{
 				Commit:          &c,
 				Session:         &s,
 				LinkConfidence:  matchedCommits[0].confidence,
 				MessageStartIdx: 0,
 				MessageEndIdx:   len(s.Messages),
-			})
+			}
+			entry.ManualCommit = isManualCommit(c, s.Messages, 0, len(s.Messages))
+			entries = append(entries, entry)
 		} else {
 			// Multiple commits: split session messages into segments
 			segmentEntries := splitSessionByCommits(session, matchedCommits)
@@ -172,13 +174,15 @@ func splitSessionByCommits(session *model.Session, commits []indexedCommit) []mo
 	for i, mc := range commits {
 		c := *mc.commit
 		s := *session
-		entries = append(entries, model.TimelineEntry{
+		entry := model.TimelineEntry{
 			Commit:          &c,
 			Session:         &s,
 			LinkConfidence:  mc.confidence,
 			MessageStartIdx: segments[i].startIdx,
 			MessageEndIdx:   segments[i].endIdx,
-		})
+		}
+		entry.ManualCommit = isManualCommit(c, s.Messages, segments[i].startIdx, segments[i].endIdx)
+		entries = append(entries, entry)
 	}
 
 	return entries
@@ -233,10 +237,39 @@ func computeConfidence(commit model.GitCommit, session model.Session) float64 {
 	return score
 }
 
+// isManualCommit checks whether a commit linked to a session segment was likely
+// made manually (not by the AI agent). It returns true if the commit's changed
+// files have zero overlap with file paths found in tool calls within the segment.
+func isManualCommit(commit model.GitCommit, messages []model.Message, startIdx, endIdx int) bool {
+	if len(commit.ChangedFiles) == 0 {
+		return false // no file info, can't determine
+	}
+
+	// Extract file paths from the segment's tool calls
+	segmentFiles := extractFilePathsFromMessages(messages, startIdx, endIdx)
+	if len(segmentFiles) == 0 {
+		// No tool calls in the segment at all — could be manual
+		return true
+	}
+
+	overlap := fileOverlap(commit.ChangedFiles, segmentFiles)
+	return overlap == 0
+}
+
 func extractFilePaths(session model.Session) []string {
+	return extractFilePathsFromMessages(session.Messages, 0, len(session.Messages))
+}
+
+func extractFilePathsFromMessages(messages []model.Message, startIdx, endIdx int) []string {
+	if startIdx < 0 {
+		startIdx = 0
+	}
+	if endIdx > len(messages) {
+		endIdx = len(messages)
+	}
 	seen := make(map[string]bool)
 	var paths []string
-	for _, msg := range session.Messages {
+	for _, msg := range messages[startIdx:endIdx] {
 		for _, tc := range msg.ToolCalls {
 			input := tc.Input
 			for _, candidate := range extractPathsFromString(input) {

@@ -54,7 +54,7 @@ export function TimelineList({ entries }: { entries: TimelineEntry[] }) {
 }
 
 function TimelineEntryRow({ entry }: { entry: TimelineEntry }) {
-  const { commit, session, link_confidence } = entry;
+  const { commit, session, link_confidence, manual_commit } = entry;
   const hasLink = commit && session;
   const commitOnly = commit && !session;
 
@@ -117,7 +117,13 @@ function TimelineEntryRow({ entry }: { entry: TimelineEntry }) {
         {/* Session info */}
         {session && (
           <div className="flex items-center gap-2 flex-wrap">
-            <AgentBadge agent={session.agent} />
+            {manual_commit ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono bg-blue-500/10 border border-blue-500/30 text-blue-400">
+                Manual
+              </span>
+            ) : (
+              <AgentBadge agent={session.agent} />
+            )}
             {hasLink && <ConfidenceDot confidence={link_confidence} />}
             <span className="text-xs text-muted-foreground font-mono">
               {formatTime(session.started_at)}

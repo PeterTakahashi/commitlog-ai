@@ -52,6 +52,7 @@ export interface TimelineEntry {
   commit?: GitCommit;
   session?: Session;
   link_confidence: number;
+  manual_commit?: boolean;
   message_start_idx?: number;
   message_end_idx?: number;
 }

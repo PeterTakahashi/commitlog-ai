@@ -13,8 +13,9 @@ type TimelineEntry struct {
 	Commit           *GitCommit `json:"commit,omitempty"`
 	Session          *Session   `json:"session,omitempty"`
 	LinkConfidence   float64    `json:"link_confidence"`
-	MessageStartIdx  int        `json:"message_start_idx"` // inclusive, for segmented view
-	MessageEndIdx    int        `json:"message_end_idx"`   // exclusive, for segmented view
+	ManualCommit     bool       `json:"manual_commit,omitempty"` // true if commit has no file overlap with session tool calls
+	MessageStartIdx  int        `json:"message_start_idx"`       // inclusive, for segmented view
+	MessageEndIdx    int        `json:"message_end_idx"`         // exclusive, for segmented view
 }
 
 // GitCommit holds metadata about a single git commit.
