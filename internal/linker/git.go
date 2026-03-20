@@ -111,6 +111,17 @@ func (g *GitClient) GetDiff(hash string) (string, error) {
 	return string(out), nil
 }
 
+// GetHead returns the current HEAD commit hash.
+func (g *GitClient) GetHead() (string, error) {
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = g.RepoDir
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("git rev-parse HEAD: %w", err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
 // GetRepoRoot returns the root directory of the git repository.
 func (g *GitClient) GetRepoRoot() (string, error) {
 	cmd := exec.Command("git", "rev-parse", "--show-toplevel")

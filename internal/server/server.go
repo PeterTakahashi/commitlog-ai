@@ -23,6 +23,7 @@ type Server struct {
 	Port       int
 	StaticFS   fs.FS        // embedded or filesystem-based
 	OnReady    func(port int) // called once the server is listening
+	mu         sync.RWMutex
 	timeline   *model.LinkedTimeline
 	sessions   map[string]*model.Session
 	gitClient  *linker.GitClient
@@ -51,19 +52,30 @@ func (s *Server) loadData() error {
 	if err := json.Unmarshal(data, &timeline); err != nil {
 		return fmt.Errorf("parsing timeline.json: %w", err)
 	}
-	s.timeline = &timeline
 
-	// Index sessions by ID
+	sessions := make(map[string]*model.Session)
 	for i, entry := range timeline.Entries {
 		if entry.Session != nil {
-			s.sessions[entry.Session.ID] = timeline.Entries[i].Session
+			sessions[entry.Session.ID] = timeline.Entries[i].Session
 		}
 	}
 
-	// Setup git client
-	s.gitClient = linker.NewGitClient(s.ProjectDir)
+	s.mu.Lock()
+	s.timeline = &timeline
+	s.sessions = sessions
+	s.mu.Unlock()
+
+	// Setup git client (idempotent)
+	if s.gitClient == nil {
+		s.gitClient = linker.NewGitClient(s.ProjectDir)
+	}
 
 	return nil
+}
+
+// ReloadData re-reads timeline.json from disk and updates in-memory data.
+func (s *Server) ReloadData() error {
+	return s.loadData()
 }
 
 // Start loads data and starts the HTTP server.
@@ -139,6 +151,9 @@ type PaginatedTimeline struct {
 }
 
 func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	q := r.URL.Query()
 	agentFilter := q.Get("agent")
 	search := strings.ToLower(q.Get("q"))
@@ -218,6 +233,9 @@ func entryMatchesSearch(e model.TimelineEntry, query string) bool {
 }
 
 func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	// Extract session ID from path: /api/sessions/{id}
 	id := strings.TrimPrefix(r.URL.Path, "/api/sessions/")
 	if id == "" {
@@ -269,6 +287,9 @@ func (s *Server) handleCommitDiff(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSessionCommits(w http.ResponseWriter, r *http.Request) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	// /api/sessions-commits/{id} → all commits linked to this session with diffs
 	id := strings.TrimPrefix(r.URL.Path, "/api/sessions-commits/")
 	if id == "" {
@@ -301,6 +322,9 @@ func (s *Server) handleSessionCommits(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	stats := map[string]any{
 		"total_entries":  len(s.timeline.Entries),
 		"total_sessions": len(s.sessions),

@@ -22,6 +22,7 @@ export function TimelinePage() {
   const [agent, setAgent] = useState("");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -86,8 +87,15 @@ export function TimelinePage() {
     return () => observer.disconnect();
   }, [loadMore]);
 
+  const handleSearchInput = (value: string) => {
+    setSearchInput(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setSearch(value), 300);
+  };
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     setSearch(searchInput);
   };
 
@@ -114,8 +122,8 @@ export function TimelinePage() {
           <input
             type="text"
             value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="commit message..."
+            onChange={(e) => handleSearchInput(e.target.value)}
+            placeholder="commit hash or message..."
             className="w-full text-sm bg-muted border border-border rounded px-2 py-1.5 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
           />
         </form>
