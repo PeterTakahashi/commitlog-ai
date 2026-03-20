@@ -16,3 +16,4 @@ web/dist/
 # OS files
 .DS_Store
 node_modules
+.aitrace
