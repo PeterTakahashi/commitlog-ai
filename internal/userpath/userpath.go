@@ -10,23 +10,29 @@ import (
 	"github.com/PeterTakahashi/commitlog-ai/internal/model"
 )
 
-// SanitizeEmail converts an email address into a safe directory name.
-// alice@example.com → alice_at_example_com
-func SanitizeEmail(email string) string {
-	email = strings.ToLower(strings.TrimSpace(email))
-	email = strings.ReplaceAll(email, "@", "_at_")
-	email = strings.ReplaceAll(email, ".", "_")
-	return email
+// SanitizeName converts a git user.name into a safe directory name.
+// "Peter Takahashi" → "peter-takahashi"
+func SanitizeName(name string) string {
+	name = strings.ToLower(strings.TrimSpace(name))
+	name = strings.ReplaceAll(name, " ", "-")
+	// Remove characters that are unsafe for directory names
+	var safe []rune
+	for _, r := range name {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			safe = append(safe, r)
+		}
+	}
+	return string(safe)
 }
 
 // UserSessionsDir returns the per-user sessions directory path.
-func UserSessionsDir(projectDir, email string) string {
-	return filepath.Join(projectDir, ".commitlog-ai", "sessions", SanitizeEmail(email))
+func UserSessionsDir(projectDir, name string) string {
+	return filepath.Join(projectDir, ".commitlog-ai", "sessions", SanitizeName(name))
 }
 
 // UserSessionsPath returns the per-user sessions.json file path.
-func UserSessionsPath(projectDir, email string) string {
-	return filepath.Join(UserSessionsDir(projectDir, email), "sessions.json")
+func UserSessionsPath(projectDir, name string) string {
+	return filepath.Join(UserSessionsDir(projectDir, name), "sessions.json")
 }
 
 // ReadAllSessions reads all sessions from all per-user session files.

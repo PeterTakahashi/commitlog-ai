@@ -49,22 +49,22 @@ func Build(projectDir string) (*Result, error) {
 		}
 	}
 
-	// Get user email for per-user directory
+	// Get user name for per-user directory
 	git := linker.NewGitClient(projectDir)
-	email, err := git.GetUserEmail()
+	userName, err := git.GetUserName()
 	if err != nil {
-		return nil, fmt.Errorf("git config user.email not set: %w", err)
+		return nil, fmt.Errorf("git config user.name not set: %w", err)
 	}
 
 	// Migrate legacy sessions.json if present
-	userpath.MigrateLegacy(projectDir, email)
+	userpath.MigrateLegacy(projectDir, userName)
 
 	outDir := filepath.Join(projectDir, ".commitlog-ai")
 	if err := os.MkdirAll(outDir, 0755); err != nil {
 		return nil, fmt.Errorf("creating output directory: %w", err)
 	}
 
-	sessionsPath := userpath.UserSessionsPath(projectDir, email)
+	sessionsPath := userpath.UserSessionsPath(projectDir, userName)
 
 	// Check parse cache
 	c := cache.Load(projectDir)
@@ -90,7 +90,7 @@ func Build(projectDir string) (*Result, error) {
 		result.SessionCount = len(allSessions)
 
 		// Write to per-user directory
-		userDir := userpath.UserSessionsDir(projectDir, email)
+		userDir := userpath.UserSessionsDir(projectDir, userName)
 		if err := os.MkdirAll(userDir, 0755); err != nil {
 			return nil, fmt.Errorf("creating user sessions directory: %w", err)
 		}

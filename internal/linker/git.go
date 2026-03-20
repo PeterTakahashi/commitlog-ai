@@ -150,13 +150,13 @@ func (g *GitClient) GetBranchCommitHashes(branch string) (map[string]bool, error
 	return hashes, nil
 }
 
-// GetUserEmail returns the git user.email for the repository.
-func (g *GitClient) GetUserEmail() (string, error) {
-	cmd := exec.Command("git", "config", "user.email")
+// GetUserName returns the git user.name for the repository.
+func (g *GitClient) GetUserName() (string, error) {
+	cmd := exec.Command("git", "config", "user.name")
 	cmd.Dir = g.RepoDir
 	out, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("git config user.email: %w", err)
+		return "", fmt.Errorf("git config user.name: %w", err)
 	}
 	return strings.TrimSpace(string(out)), nil
 }
