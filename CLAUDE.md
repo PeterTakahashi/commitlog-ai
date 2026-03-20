@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-aitrace is a Go CLI + React SPA that connects Claude Code conversations to git commit history. Single binary, zero external dependencies.
+aitrace is a Go CLI + React SPA that connects AI coding agent conversations (Claude Code, Gemini CLI, Codex CLI) to git commit history. Single binary, zero external dependencies.
 
 ## Tech Stack
 
@@ -52,6 +52,8 @@ internal/
   parser/
     parser.go          Parser interface (Name, Detect, Parse) + AllParsers() + ParserVersion constant
     claude.go          Claude Code parser (~/.claude/projects/<hash>/<uuid>.jsonl)
+    gemini.go          Gemini CLI parser (~/.gemini/tmp/<project>/chats/session-*.json)
+    codex.go           Codex CLI parser (~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl + legacy .json)
 
   linker/
     git.go             Git CLI wrapper (git log with %H%aI%an%ae%B using %x01 separator, git diff --numstat, git diff, GetHead)
@@ -117,6 +119,20 @@ web/
 - Key fields: `type` ("user"|"assistant"), `sessionId`, `timestamp`, `message.content` (array of content blocks), `message.model`, `isSidechain`
 - Tool uses in assistant content blocks (`type: "tool_use"`), tool results in next user message (`type: "tool_result"`, matched by `tool_use_id`)
 - Skip entries with `isSidechain: true` (subagent logs)
+
+### Gemini CLI (`~/.gemini/tmp/<project-dir-or-hash>/chats/session-*.json`)
+- Single JSON file per session (not JSONL)
+- Top-level: `sessionId`, `startTime`, `lastUpdated`, `messages[]`, `kind` ("main" = keep, others = skip)
+- `.project_root` file in parent dir contains absolute project path for matching
+- Messages: `type` ("user"|"gemini"), `content` (string for gemini, array of `{text}` for user), `model`, `tokens`, `toolCalls[]`
+- Tool calls: `name`, `args` (JSON), `result[].functionResponse.response.output`
+
+### Codex CLI (`~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`)
+- JSONL format (new) or single JSON (legacy `rollout-*.json`)
+- JSONL entry types: `session_meta` (id, cwd, git info), `turn_context` (model), `event_msg` (user_message/agent_message), `response_item` (function_call/function_call_output)
+- User input comes from `event_msg` with `type: "user_message"`, NOT from `response_item` with `role: "user"` (those are system prompts)
+- Tool calls: `response_item` with `type: "function_call"` (name, arguments, call_id) paired with `type: "function_call_output"` (call_id, output)
+- Legacy JSON: `{session: {id, timestamp}, items: [{type, role, content, action, call_id, output}]}`
 
 ## API Endpoints
 

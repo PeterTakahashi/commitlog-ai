@@ -2,7 +2,7 @@
 
 > See the prompts behind every git commit.
 
-**aitrace** connects your Claude Code conversations to your git history, giving your team a complete picture of AI-assisted development.
+**aitrace** connects your AI coding agent conversations to your git history, giving your team a complete picture of AI-assisted development.
 
 ## The Problem
 
@@ -10,13 +10,13 @@ You use Claude Code daily. But `git log` only shows *what* changed, not *why*, n
 
 ## The Solution
 
-aitrace reads Claude Code logs, converts them into a unified format, matches them to git commits by timestamp, and serves a web UI to browse it all. API keys and secrets found in logs are automatically masked before output.
+aitrace reads agent logs (Claude Code, Gemini CLI, Codex CLI), converts them into a unified format, matches them to git commits by timestamp, and serves a web UI to browse it all. API keys and secrets found in logs are automatically masked before output.
 
 ```
-Claude Code Logs ──▶ aitrace parse ──▶ aitrace link ──▶ aitrace serve
-                                                             │
-                                                    localhost:3100
-                                           Timeline + Conversations + Diffs
+Agent Logs ──▶ aitrace parse ──▶ aitrace link ──▶ aitrace serve
+(Claude/Gemini/Codex)                                    │
+                                                 localhost:3100
+                                        Timeline + Conversations + Diffs
 ```
 
 ## Quick Start
@@ -30,16 +30,20 @@ cd your-project
 aitrace serve --build    # Parse + link + serve, auto-rebuilds on new commits
 
 # Option 2: Step by step
-aitrace parse            # Read Claude Code logs → unified format
+aitrace parse            # Read agent logs → unified format
 aitrace link             # Match sessions to git commits
 aitrace serve            # Open web UI at localhost:3100
 ```
 
 ## Supported Agents
 
-| Agent | Status | Log Location |
-|-------|--------|-------------|
-| Claude Code | Supported | `~/.claude/projects/` |
+| Agent | Status | Minimum Version | Log Location |
+|-------|--------|----------------|-------------|
+| Claude Code | Supported | 1.0.0+ | `~/.claude/projects/` |
+| Gemini CLI | Supported | 0.1.0+ | `~/.gemini/tmp/<project>/chats/` |
+| Codex CLI | Supported | 0.1.0+ | `~/.codex/sessions/` |
+
+> **Note**: aitrace reads the local log files that each agent writes to disk. If your agent version is too old and uses a different log format, parsing may fail. The versions above are the earliest known to produce compatible logs. Tested with Claude Code 2.1.79, Gemini CLI 0.34.0, and Codex CLI 0.116.0.
 
 ## Features
 
@@ -64,6 +68,8 @@ $ aitrace status
 Project: /Users/you/dev/myproject
 
   claude_code   3 log file(s)
+  gemini_cli    1 log file(s)
+  codex_cli     2 log file(s)
 ```
 
 ### `aitrace parse`
@@ -177,7 +183,7 @@ go run ./cmd/aitrace/ serve    # Go API on :3100
 cmd/aitrace/           CLI entry point and subcommands
 internal/
   model/               Unified data types (Session, Message, Timeline)
-  parser/              Claude Code log parser
+  parser/              Log parsers (Claude Code, Gemini CLI, Codex CLI)
   linker/              Git operations and timestamp-based matching
   builder/             Unified parse+link logic for serve --build
   cache/               Parse/link caching with parser version invalidation

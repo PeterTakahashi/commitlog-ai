@@ -3,7 +3,7 @@ package parser
 import "github.com/anthropics/aitrace/internal/model"
 
 // ParserVersion is bumped when parser logic changes to invalidate caches.
-const ParserVersion = "1"
+const ParserVersion = "2"
 
 // Parser can detect and parse agent log files into unified sessions.
 type Parser interface {
@@ -19,5 +19,7 @@ type Parser interface {
 func AllParsers() []Parser {
 	return []Parser{
 		&ClaudeParser{},
+		&GeminiParser{},
+		&CodexParser{},
 	}
 }
