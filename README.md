@@ -15,7 +15,7 @@ aitrace reads Claude Code logs, converts them into a unified format, matches the
 ```
 Claude Code Logs ──▶ aitrace parse ──▶ aitrace link ──▶ aitrace serve
                                                              │
-                                                    localhost:3000
+                                                    localhost:3100
                                            Timeline + Conversations + Diffs
 ```
 
@@ -25,9 +25,14 @@ Claude Code Logs ──▶ aitrace parse ──▶ aitrace link ──▶ aitrac
 go install github.com/anthropics/aitrace@latest
 
 cd your-project
-aitrace parse        # Read Claude Code logs → unified format
-aitrace link         # Match sessions to git commits
-aitrace serve        # Open web UI at localhost:3000
+
+# Option 1: All-in-one (recommended)
+aitrace serve --build    # Parse + link + serve, auto-rebuilds on new commits
+
+# Option 2: Step by step
+aitrace parse            # Read Claude Code logs → unified format
+aitrace link             # Match sessions to git commits
+aitrace serve            # Open web UI at localhost:3100
 ```
 
 ## Supported Agents
@@ -38,9 +43,13 @@ aitrace serve        # Open web UI at localhost:3000
 
 ## Features
 
+- **`serve --build`** — One command does everything: parse, link, serve, and auto-rebuild when new git commits are detected (2-second polling)
+- **Caching** — Parse and link results are cached; only rebuilds when source files change, new commits appear, or parser version is updated. Use `--force` to bypass.
 - **API Key Masking** — Secrets (OpenAI, Anthropic, AWS, Azure, GitHub tokens, etc.) are automatically detected and masked in all output files
 - **Git Author Info** — Each commit shows author name, email, and GitHub profile icon in the web UI
-- **Auto Port Fallback** — If port 3000 is busy, an available port is automatically selected
+- **Full Session View** — Browse the complete conversation for any session, with all code changes across every linked commit
+- **Commit Hash Search** — Search timeline by commit hash or commit message with real-time filtering
+- **Auto Port Fallback** — If port 3100 is busy, an available port is automatically selected
 - **Server-side Pagination** — Handles repositories with thousands of commits efficiently
 - **Markdown Export** — Export the full timeline as a single Markdown file
 
@@ -59,7 +68,7 @@ Project: /Users/you/dev/myproject
 
 ### `aitrace parse`
 
-Parse all detected agent logs into a unified JSON format. Secrets are automatically masked. Output is written to `.aitrace/sessions.json`.
+Parse all detected agent logs into a unified JSON format. Secrets are automatically masked. Output is written to `.aitrace/sessions.json`. Results are cached and only re-parsed when source files change or the parser version is updated.
 
 ```
 $ aitrace parse
@@ -70,9 +79,12 @@ $ aitrace parse
 Parsed 2 session(s) → .aitrace/sessions.json
 ```
 
+Options:
+- `--force` — Ignore cache and re-parse all logs
+
 ### `aitrace link`
 
-Match parsed sessions to git commits using timestamp-based heuristics. Output is written to `.aitrace/timeline.json`.
+Match parsed sessions to git commits using timestamp-based heuristics. Output is written to `.aitrace/timeline.json`. Results are cached and only re-linked when sessions.json changes or new commits are detected.
 
 ```
 $ aitrace link
@@ -80,18 +92,22 @@ Found 2 session(s) and 28 commit(s)
 Linked 2 pair(s), 28 total entries → .aitrace/timeline.json
 ```
 
+Options:
+- `--force` — Ignore cache and re-link
+
 ### `aitrace serve`
 
 Start a local web server to browse the linked timeline. If the default port is in use, an available port is automatically selected.
 
 ```
 $ aitrace serve
-aitrace server running at http://localhost:3000
+aitrace server running at http://localhost:3100
   28 timeline entries, 2 sessions
 ```
 
 Options:
-- `--port <number>` — Server port (default: 3000, auto-fallback if busy)
+- `--build` — Run parse+link before serving and auto-rebuild on new git commits
+- `--port <number>` — Server port (default: 3100, auto-fallback if busy)
 - `--no-browser` — Don't open browser automatically
 
 ### `aitrace export`
@@ -126,10 +142,11 @@ Unmatched commits and sessions are shown as standalone entries.
 
 ## Web UI
 
-The web viewer provides three views:
+The web viewer provides four views:
 
-- **Timeline** — A git-log-style list with infinite scroll, server-side pagination, agent filter, and full-text search. Each entry shows the commit author's GitHub avatar, name, and file change stats.
-- **Session Detail** — Split view with the full conversation on the left (showing the commit author's name instead of "You") and the git diff on the right. Tool approval messages are shown inline with the approved tool name.
+- **Timeline** — A git-log-style list with infinite scroll, server-side pagination, agent filter, and search by commit hash or message. Each entry shows the commit author's GitHub avatar, name, and file change stats.
+- **Session Detail** — Split view with the conversation segment on the left (showing the commit author's name instead of "You") and the git diff on the right. Tool approval messages are shown inline with the approved tool name.
+- **Full Session** — Complete conversation for an entire session with a separate tab showing all code changes across every linked commit with collapsible diffs.
 - **Stats** — Dashboard showing session counts by agent, link status breakdown, and message totals
 
 ## Architecture
@@ -137,6 +154,8 @@ The web viewer provides three views:
 - **Go CLI** — Single binary, zero external dependencies (no database, no Docker)
 - **React SPA** — Built with Vite + TypeScript + Tailwind CSS v4 + shadcn/ui, embedded into the Go binary via `go:embed`
 - **JSON-based** — All data stored as JSON files in `.aitrace/`, portable and git-friendly. Loaded into memory at serve time with server-side pagination.
+- **Caching** — File modification time + size for parse cache, git HEAD hash for link cache. Cache metadata stored in `.aitrace/cache.json`. Parser version changes invalidate all caches.
+- **Hot Reload** — `serve --build` uses `sync.RWMutex` to safely swap data while API handlers continue serving requests
 - **Secret Sanitizer** — Regex-based detection and masking of API keys, tokens, and credentials before any file is written
 
 ## Development
@@ -148,8 +167,8 @@ rm -rf internal/server/dist && cp -r web/dist internal/server/dist
 go build -o bin/aitrace ./cmd/aitrace/
 
 # Development: run Vite dev server + Go API separately
-cd web && npm run dev          # Vite on :5173 (proxies /api to :3000)
-go run ./cmd/aitrace/ serve    # Go API on :3000
+cd web && npm run dev          # Vite on :5173 (proxies /api to :3100)
+go run ./cmd/aitrace/ serve    # Go API on :3100
 ```
 
 ### Project Structure
@@ -160,6 +179,8 @@ internal/
   model/               Unified data types (Session, Message, Timeline)
   parser/              Claude Code log parser
   linker/              Git operations and timestamp-based matching
+  builder/             Unified parse+link logic for serve --build
+  cache/               Parse/link caching with parser version invalidation
   exporter/            JSON and Markdown export
   sanitizer/           API key and secret masking
   server/              HTTP server with embedded React SPA + paginated API

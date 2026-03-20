@@ -29,6 +29,7 @@ cd web && npx tsc --noEmit
 ./bin/aitrace parse
 ./bin/aitrace link
 ./bin/aitrace serve --no-browser
+./bin/aitrace serve --build --no-browser
 ./bin/aitrace export --format markdown
 ```
 
@@ -37,9 +38,9 @@ cd web && npx tsc --noEmit
 ```
 cmd/aitrace/
   main.go              Root cobra command
-  cmd_parse.go         `aitrace parse` - runs parser, sanitizes secrets, writes .aitrace/sessions.json
-  cmd_link.go          `aitrace link` - matches sessions to git commits, sanitizes, writes .aitrace/timeline.json
-  cmd_serve.go         `aitrace serve` - starts HTTP server with embedded React SPA
+  cmd_parse.go         `aitrace parse` - runs parser, sanitizes secrets, writes .aitrace/sessions.json (--force to bypass cache)
+  cmd_link.go          `aitrace link` - matches sessions to git commits, sanitizes, writes .aitrace/timeline.json (--force to bypass cache)
+  cmd_serve.go         `aitrace serve` - starts HTTP server with embedded React SPA (--build for auto parse+link+rebuild)
   cmd_export.go        `aitrace export` - exports as JSON or Markdown
   cmd_status.go        `aitrace status` - shows detected log sources
 
@@ -49,12 +50,18 @@ internal/
     timeline.go        Core types: LinkedTimeline, TimelineEntry, GitCommit (includes AuthorEmail)
 
   parser/
-    parser.go          Parser interface (Name, Detect, Parse) + AllParsers()
+    parser.go          Parser interface (Name, Detect, Parse) + AllParsers() + ParserVersion constant
     claude.go          Claude Code parser (~/.claude/projects/<hash>/<uuid>.jsonl)
 
   linker/
-    git.go             Git CLI wrapper (git log with %H%aI%an%ae%s, git diff --numstat, git diff)
-    matcher.go         Timestamp-based matching algorithm with confidence scoring
+    git.go             Git CLI wrapper (git log with %H%aI%an%ae%B using %x01 separator, git diff --numstat, git diff, GetHead)
+    matcher.go         Timestamp-based matching algorithm with confidence scoring + session segmentation by commit
+
+  builder/
+    builder.go         Unified parse+link logic with caching for serve --build. Exports Build(projectDir) → Result
+
+  cache/
+    cache.go           Parse/link caching. ParseCache checks file size+mtime+parser version. LinkCache checks sessions.json mtime+git HEAD+parser version. Stored in .aitrace/cache.json
 
   exporter/
     json.go            JSON export
@@ -64,19 +71,20 @@ internal/
     sanitizer.go       API key/secret detection and masking (OpenAI, Anthropic, AWS, Azure, GitHub, Bearer, etc.)
 
   server/
-    server.go          HTTP server: paginated /api/timeline, /api/sessions/:id, /api/commits/:hash/diff, /api/stats, /api/avatar
+    server.go          HTTP server with sync.RWMutex for hot reload, ReloadData() method, paginated API endpoints
     embed.go           go:embed for React dist files
 
 web/
   src/
     lib/types.ts       TypeScript types matching Go model (Session, TimelineEntry, GitCommit with author_email, etc.)
-    lib/api.ts         API client with pagination params + avatar cache
+    lib/api.ts         API client with pagination params, avatar cache, debounced search
     pages/
-      TimelinePage.tsx      Main view with infinite scroll, search, agent filter
-      SessionDetailPage.tsx Split view: conversation + diff, passes author name from URL params
+      TimelinePage.tsx      Main view with infinite scroll, search (commit hash + message), agent filter
+      SessionDetailPage.tsx Split view: conversation segment + diff, passes author name from URL params
+      SessionFullPage.tsx   Full session view: complete conversation + all commits with collapsible diffs
       StatsPage.tsx         Stats dashboard
     components/
-      TimelineList.tsx      Timeline entries grouped by date, with author avatar
+      TimelineList.tsx      Timeline entries grouped by date, with author avatar, multi-line commit messages
       AuthorAvatar.tsx      GitHub avatar via /api/avatar (Gravatar fallback) + initials fallback
       AgentBadge.tsx        Agent type badge (Claude=orange)
       ConfidenceDot.tsx     Match confidence indicator
@@ -88,7 +96,11 @@ web/
 ## Key Architecture Decisions
 
 - **No database**: JSON files in `.aitrace/` are loaded into memory at serve time. Server-side pagination via Go slices. This keeps `go install` working without CGO/SQLite.
-- **Auto port fallback**: If default port 3000 is busy, server auto-selects a free port via `net.Listen("tcp", "localhost:0")`.
+- **Default port 3100**: Changed from 3000 to avoid conflicts with common dev servers. Auto-fallback via `net.Listen("tcp", "localhost:0")` if busy.
+- **Caching**: File modification time + size for parse cache, git HEAD hash for link cache. Cache metadata in `.aitrace/cache.json`. Parser version (`ParserVersion` in `parser.go`) change invalidates all caches. Parse invalidation also clears link cache.
+- **serve --build**: Runs `builder.Build()` at startup, then polls `git rev-parse HEAD` every 2 seconds in a goroutine. On HEAD change: rebuild + `server.ReloadData()`. Uses `sync.RWMutex` so API handlers continue serving during reload.
+- **Git log format**: Uses `%B` (full commit body) instead of `%s` (subject only) with `%x01` as record separator to support multi-line commit messages.
+- **Session segmentation**: Long sessions are split by commit boundaries with minimum 4 messages per segment. Segments can overlap backwards for context.
 - **Dark mode**: Applied via `document.documentElement.classList.add("dark")` in App.tsx. Must be on `<html>`, not a wrapper `<div>`.
 - **JSONL buffer size**: Claude parser uses 10MB scanner buffer for large log lines.
 - **Rune-aware truncation**: Markdown export truncates by `[]rune` count, not byte count, to avoid splitting multibyte UTF-8 characters.
@@ -111,9 +123,13 @@ web/
 ```
 GET /api/timeline?page=1&page_size=50&agent=claude_code&q=search
     → PaginatedTimeline {entries, git_repo, total, page, page_size, has_more}
+    Search matches commit hash and commit message
 
-GET /api/sessions/:id
-    → Session (with full messages)
+GET /api/sessions/:id?start=0&end=10
+    → Session (with full or sliced messages for segmented views)
+
+GET /api/sessions-commits/:id
+    → [{hash, author, message, timestamp, diff, ...}] (all commits linked to session with diffs)
 
 GET /api/commits/:hash/diff
     → {diff: "...full diff text..."}
@@ -130,13 +146,14 @@ GET /api/avatar?email=user@example.com
 ### Adding a new agent parser
 1. Create `internal/parser/newagent.go` implementing the `Parser` interface
 2. Add to `AllParsers()` in `internal/parser/parser.go`
-3. No other changes needed - parse/status commands auto-discover parsers
+3. Bump `ParserVersion` in `internal/parser/parser.go` to invalidate caches
+4. No other changes needed - parse/status commands auto-discover parsers
 
 ### Changing the matching algorithm
 Edit `internal/linker/matcher.go` → `computeConfidence()` function
 
 ### Adding a new API endpoint
-1. Add handler in `internal/server/server.go`
+1. Add handler in `internal/server/server.go` (use `s.mu.RLock()/RUnlock()` for data access)
 2. Register in `Start()` method's `mux.HandleFunc()`
 3. Update `web/src/lib/api.ts` and `web/src/lib/types.ts`
 
