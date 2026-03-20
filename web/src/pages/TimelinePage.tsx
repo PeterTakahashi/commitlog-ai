@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { fetchTimeline } from "@/lib/api";
+import { fetchTimeline, fetchBranches } from "@/lib/api";
 import type { TimelineEntry } from "@/lib/types";
 import { TimelineList } from "@/components/TimelineList";
 import { Link } from "react-router-dom";
@@ -22,11 +22,18 @@ export function TimelinePage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [agent, setAgent] = useState("");
+  const [branch, setBranch] = useState("");
+  const [branches, setBranches] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Fetch branches once on mount
+  useEffect(() => {
+    fetchBranches().then(setBranches).catch(console.error);
+  }, []);
 
   // Reset and fetch page 1 when filters change
   useEffect(() => {
@@ -39,6 +46,7 @@ export function TimelinePage() {
       page: 1,
       pageSize: PAGE_SIZE,
       search: search || undefined,
+      branch: branch || undefined,
     })
       .then((data) => {
         setEntries(data.entries ?? []);
@@ -48,7 +56,7 @@ export function TimelinePage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [agent, search]);
+  }, [agent, search, branch]);
 
   // Load next page
   const loadMore = useCallback(() => {
@@ -61,6 +69,7 @@ export function TimelinePage() {
       page: nextPage,
       pageSize: PAGE_SIZE,
       search: search || undefined,
+      branch: branch || undefined,
     })
       .then((data) => {
         setEntries((prev) => [...prev, ...(data.entries ?? [])]);
@@ -69,7 +78,7 @@ export function TimelinePage() {
       })
       .catch(console.error)
       .finally(() => setLoadingMore(false));
-  }, [page, agent, search, hasMore, loadingMore]);
+  }, [page, agent, search, branch, hasMore, loadingMore]);
 
   // Intersection observer for infinite scroll
   useEffect(() => {
@@ -149,6 +158,26 @@ export function TimelinePage() {
             </button>
           ))}
         </div>
+
+        {branches.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="text-xs font-mono text-muted-foreground uppercase tracking-wider">
+              Branch
+            </h4>
+            <select
+              value={branch}
+              onChange={(e) => setBranch(e.target.value)}
+              className="w-full text-sm bg-muted border border-border rounded px-2 py-1.5 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              <option value="">All branches</option>
+              {branches.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="pt-4 border-t border-border">
           <Link

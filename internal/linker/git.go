@@ -111,6 +111,56 @@ func (g *GitClient) GetDiff(hash string) (string, error) {
 	return string(out), nil
 }
 
+// GetBranches returns all local and remote branch names.
+func (g *GitClient) GetBranches() ([]string, error) {
+	cmd := exec.Command("git", "branch", "-a", "--format=%(refname:short)")
+	cmd.Dir = g.RepoDir
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("git branch: %w", err)
+	}
+
+	var branches []string
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || line == "origin/HEAD" {
+			continue
+		}
+		branches = append(branches, line)
+	}
+	return branches, nil
+}
+
+// GetBranchCommitHashes returns the set of commit hashes reachable from a branch.
+func (g *GitClient) GetBranchCommitHashes(branch string) (map[string]bool, error) {
+	cmd := exec.Command("git", "log", branch, "--format=%H")
+	cmd.Dir = g.RepoDir
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("git log %s: %w", branch, err)
+	}
+
+	hashes := make(map[string]bool)
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			hashes[line] = true
+		}
+	}
+	return hashes, nil
+}
+
+// GetUserEmail returns the git user.email for the repository.
+func (g *GitClient) GetUserEmail() (string, error) {
+	cmd := exec.Command("git", "config", "user.email")
+	cmd.Dir = g.RepoDir
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("git config user.email: %w", err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
 // GetHead returns the current HEAD commit hash.
 func (g *GitClient) GetHead() (string, error) {
 	cmd := exec.Command("git", "rev-parse", "HEAD")

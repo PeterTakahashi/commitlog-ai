@@ -2,17 +2,26 @@ import type { PaginatedTimeline, Session, Stats } from "./types";
 
 const BASE = "/api";
 
+export async function fetchBranches(): Promise<string[]> {
+  const res = await fetch(`${BASE}/branches`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.branches ?? [];
+}
+
 export async function fetchTimeline(params: {
   agent?: string;
   page?: number;
   pageSize?: number;
   search?: string;
+  branch?: string;
 }): Promise<PaginatedTimeline> {
   const sp = new URLSearchParams();
   if (params.agent) sp.set("agent", params.agent);
   if (params.page) sp.set("page", String(params.page));
   if (params.pageSize) sp.set("page_size", String(params.pageSize));
   if (params.search) sp.set("q", params.search);
+  if (params.branch) sp.set("branch", params.branch);
 
   const qs = sp.toString();
   const res = await fetch(`${BASE}/timeline${qs ? `?${qs}` : ""}`);

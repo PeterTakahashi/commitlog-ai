@@ -11,6 +11,7 @@ import (
 	"github.com/anthropics/commitlog-ai/internal/model"
 	"github.com/anthropics/commitlog-ai/internal/parser"
 	"github.com/anthropics/commitlog-ai/internal/sanitizer"
+	"github.com/anthropics/commitlog-ai/internal/userpath"
 )
 
 // Result holds the outcome of a build.
@@ -48,12 +49,22 @@ func Build(projectDir string) (*Result, error) {
 		}
 	}
 
+	// Get user email for per-user directory
+	git := linker.NewGitClient(projectDir)
+	email, err := git.GetUserEmail()
+	if err != nil {
+		return nil, fmt.Errorf("git config user.email not set: %w", err)
+	}
+
+	// Migrate legacy sessions.json if present
+	userpath.MigrateLegacy(projectDir, email)
+
 	outDir := filepath.Join(projectDir, ".commitlog-ai")
 	if err := os.MkdirAll(outDir, 0755); err != nil {
 		return nil, fmt.Errorf("creating output directory: %w", err)
 	}
 
-	sessionsPath := filepath.Join(outDir, "sessions.json")
+	sessionsPath := userpath.UserSessionsPath(projectDir, email)
 
 	// Check parse cache
 	c := cache.Load(projectDir)
@@ -78,6 +89,12 @@ func Build(projectDir string) (*Result, error) {
 		allSessions = sanitizer.SanitizeSessions(allSessions)
 		result.SessionCount = len(allSessions)
 
+		// Write to per-user directory
+		userDir := userpath.UserSessionsDir(projectDir, email)
+		if err := os.MkdirAll(userDir, 0755); err != nil {
+			return nil, fmt.Errorf("creating user sessions directory: %w", err)
+		}
+
 		data, err := json.MarshalIndent(allSessions, "", "  ")
 		if err != nil {
 			return nil, fmt.Errorf("marshaling sessions: %w", err)
@@ -91,7 +108,6 @@ func Build(projectDir string) (*Result, error) {
 	}
 
 	// --- Link phase ---
-	git := linker.NewGitClient(projectDir)
 	gitHead, err := git.GetHead()
 	if err != nil {
 		return nil, fmt.Errorf("git rev-parse HEAD: %w", err)
@@ -99,21 +115,21 @@ func Build(projectDir string) (*Result, error) {
 
 	timelinePath := filepath.Join(outDir, "timeline.json")
 
+	// Read all per-user session files for linking
+	allSessions, sessionFiles, err := userpath.ReadAllSessions(projectDir)
+	if err != nil {
+		return nil, fmt.Errorf("reading sessions: %w", err)
+	}
+
 	// Reload cache (UpdateParse may have changed it)
 	c = cache.Load(projectDir)
-	if c.IsLinkValid(parser.ParserVersion, sessionsPath, gitHead) {
+	if c.IsLinkValid(parser.ParserVersion, sessionFiles, gitHead) {
 		result.LinkCached = true
 		return result, nil
 	}
 
-	// Read sessions
-	data, err := os.ReadFile(sessionsPath)
-	if err != nil {
-		return nil, fmt.Errorf("reading sessions: %w", err)
-	}
-	var sessions []model.Session
-	if err := json.Unmarshal(data, &sessions); err != nil {
-		return nil, fmt.Errorf("parsing sessions: %w", err)
+	if len(allSessions) == 0 {
+		return nil, fmt.Errorf("no sessions found")
 	}
 
 	repoRoot, err := git.GetRepoRoot()
@@ -138,11 +154,11 @@ func Build(projectDir string) (*Result, error) {
 		commits[i].ChangedFiles = files
 	}
 
-	timeline := linker.Match(sessions, commits)
+	timeline := linker.Match(allSessions, commits)
 	timeline.GitRepo = repoRoot
 	timeline = sanitizer.SanitizeTimeline(timeline)
 
-	result.SessionCount = len(sessions)
+	result.SessionCount = len(allSessions)
 	result.CommitCount = len(commits)
 	for _, e := range timeline.Entries {
 		if e.Commit != nil && e.Session != nil {
@@ -160,7 +176,7 @@ func Build(projectDir string) (*Result, error) {
 	}
 
 	c = cache.Load(projectDir)
-	c.UpdateLink(parser.ParserVersion, sessionsPath, gitHead, timelinePath)
+	c.UpdateLink(parser.ParserVersion, sessionFiles, gitHead, timelinePath)
 	c.Save()
 
 	return result, nil
