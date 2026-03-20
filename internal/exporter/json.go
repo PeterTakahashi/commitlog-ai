@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/anthropics/commitlog-ai/internal/model"
+	"github.com/PeterTakahashi/commitlog-ai/internal/model"
 )
 
 // ExportJSON writes the timeline to a JSON file in the output directory.

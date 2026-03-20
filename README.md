@@ -22,7 +22,7 @@ Agent Logs ──▶ commitlog-ai parse ──▶ commitlog-ai link ──▶ co
 ## Quick Start
 
 ```bash
-go install github.com/anthropics/commitlog-ai@latest
+go install github.com/PeterTakahashi/commitlog-ai@latest
 
 cd your-project
 

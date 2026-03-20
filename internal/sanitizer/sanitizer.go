@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/anthropics/commitlog-ai/internal/model"
+	"github.com/PeterTakahashi/commitlog-ai/internal/model"
 )
 
 // Common API key / secret patterns

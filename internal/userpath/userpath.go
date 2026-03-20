@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/anthropics/commitlog-ai/internal/model"
+	"github.com/PeterTakahashi/commitlog-ai/internal/model"
 )
 
 // SanitizeEmail converts an email address into a safe directory name.

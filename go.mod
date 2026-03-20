@@ -1,4 +1,4 @@
-module github.com/anthropics/commitlog-ai
+module github.com/PeterTakahashi/commitlog-ai
 
 go 1.25.5
 

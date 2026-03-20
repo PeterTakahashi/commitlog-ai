@@ -13,8 +13,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/anthropics/commitlog-ai/internal/linker"
-	"github.com/anthropics/commitlog-ai/internal/model"
+	"github.com/PeterTakahashi/commitlog-ai/internal/linker"
+	"github.com/PeterTakahashi/commitlog-ai/internal/model"
 )
 
 // Server serves the React UI and API endpoints.
