@@ -40,11 +40,11 @@ type Cache struct {
 	meta CacheMeta
 }
 
-// Load reads cache metadata from .aitrace/cache.json.
+// Load reads cache metadata from .commitlog-ai/cache.json.
 // Returns a usable Cache even if the file doesn't exist.
 func Load(projectDir string) *Cache {
 	c := &Cache{
-		path: filepath.Join(projectDir, ".aitrace", "cache.json"),
+		path: filepath.Join(projectDir, ".commitlog-ai", "cache.json"),
 	}
 	data, err := os.ReadFile(c.path)
 	if err != nil {

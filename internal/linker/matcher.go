@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/anthropics/aitrace/internal/model"
+	"github.com/anthropics/commitlog-ai/internal/model"
 )
 
 const (

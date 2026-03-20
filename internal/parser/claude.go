@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/anthropics/aitrace/internal/model"
+	"github.com/anthropics/commitlog-ai/internal/model"
 )
 
 // ClaudeParser reads Claude Code JSONL session logs.

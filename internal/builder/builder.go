@@ -6,11 +6,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/anthropics/aitrace/internal/cache"
-	"github.com/anthropics/aitrace/internal/linker"
-	"github.com/anthropics/aitrace/internal/model"
-	"github.com/anthropics/aitrace/internal/parser"
-	"github.com/anthropics/aitrace/internal/sanitizer"
+	"github.com/anthropics/commitlog-ai/internal/cache"
+	"github.com/anthropics/commitlog-ai/internal/linker"
+	"github.com/anthropics/commitlog-ai/internal/model"
+	"github.com/anthropics/commitlog-ai/internal/parser"
+	"github.com/anthropics/commitlog-ai/internal/sanitizer"
 )
 
 // Result holds the outcome of a build.
@@ -48,7 +48,7 @@ func Build(projectDir string) (*Result, error) {
 		}
 	}
 
-	outDir := filepath.Join(projectDir, ".aitrace")
+	outDir := filepath.Join(projectDir, ".commitlog-ai")
 	if err := os.MkdirAll(outDir, 0755); err != nil {
 		return nil, fmt.Errorf("creating output directory: %w", err)
 	}

@@ -1,4 +1,4 @@
-module github.com/anthropics/aitrace
+module github.com/anthropics/commitlog-ai
 
 go 1.25.5
 

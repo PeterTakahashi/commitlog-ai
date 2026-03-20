@@ -107,7 +107,7 @@ export function TimelinePage() {
       <aside className="w-56 shrink-0 border-r border-border p-4 space-y-6 overflow-auto">
         <div>
           <Link to="/" className="text-lg font-bold font-mono text-foreground">
-            aitrace
+            commitlog-ai
           </Link>
           {gitRepo && (
             <p className="text-xs text-muted-foreground font-mono mt-1 truncate">
@@ -195,7 +195,7 @@ export function TimelinePage() {
               <p className="text-sm">
                 Run{" "}
                 <code className="bg-muted px-2 py-0.5 rounded">
-                  aitrace parse && aitrace link
+                  commitlog-ai parse && commitlog-ai link
                 </code>{" "}
                 first
               </p>

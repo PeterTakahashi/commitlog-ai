@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/anthropics/aitrace/internal/model"
+	"github.com/anthropics/commitlog-ai/internal/model"
 )
 
 // GitClient wraps git CLI operations.

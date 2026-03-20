@@ -1,6 +1,6 @@
 package parser
 
-import "github.com/anthropics/aitrace/internal/model"
+import "github.com/anthropics/commitlog-ai/internal/model"
 
 // ParserVersion is bumped when parser logic changes to invalidate caches.
 const ParserVersion = "2"

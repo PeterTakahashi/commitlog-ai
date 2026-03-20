@@ -1,8 +1,8 @@
-# aitrace
+# commitlog-ai
 
 > See the prompts behind every git commit.
 
-**aitrace** connects your AI coding agent conversations to your git history, giving your team a complete picture of AI-assisted development.
+**commitlog-ai** connects your AI coding agent conversations to your git history, giving your team a complete picture of AI-assisted development.
 
 ## The Problem
 
@@ -10,10 +10,10 @@ You use Claude Code daily. But `git log` only shows *what* changed, not *why*, n
 
 ## The Solution
 
-aitrace reads agent logs (Claude Code, Gemini CLI, Codex CLI), converts them into a unified format, matches them to git commits by timestamp, and serves a web UI to browse it all. API keys and secrets found in logs are automatically masked before output.
+commitlog-ai reads agent logs (Claude Code, Gemini CLI, Codex CLI), converts them into a unified format, matches them to git commits by timestamp, and serves a web UI to browse it all. API keys and secrets found in logs are automatically masked before output.
 
 ```
-Agent Logs ──▶ aitrace parse ──▶ aitrace link ──▶ aitrace serve
+Agent Logs ──▶ commitlog-ai parse ──▶ commitlog-ai link ──▶ commitlog-ai serve
 (Claude/Gemini/Codex)                                    │
                                                  localhost:3100
                                         Timeline + Conversations + Diffs
@@ -22,17 +22,17 @@ Agent Logs ──▶ aitrace parse ──▶ aitrace link ──▶ aitrace serv
 ## Quick Start
 
 ```bash
-go install github.com/anthropics/aitrace@latest
+go install github.com/anthropics/commitlog-ai@latest
 
 cd your-project
 
 # Option 1: All-in-one (recommended)
-aitrace serve --build    # Parse + link + serve, auto-rebuilds on new commits
+commitlog-ai serve --build    # Parse + link + serve, auto-rebuilds on new commits
 
 # Option 2: Step by step
-aitrace parse            # Read agent logs → unified format
-aitrace link             # Match sessions to git commits
-aitrace serve            # Open web UI at localhost:3100
+commitlog-ai parse            # Read agent logs → unified format
+commitlog-ai link             # Match sessions to git commits
+commitlog-ai serve            # Open web UI at localhost:3100
 ```
 
 ## Supported Agents
@@ -43,7 +43,7 @@ aitrace serve            # Open web UI at localhost:3100
 | Gemini CLI | Supported | 0.1.0+ | `~/.gemini/tmp/<project>/chats/` |
 | Codex CLI | Supported | 0.1.0+ | `~/.codex/sessions/` |
 
-> **Note**: aitrace reads the local log files that each agent writes to disk. If your agent version is too old and uses a different log format, parsing may fail. The versions above are the earliest known to produce compatible logs. Tested with Claude Code 2.1.79, Gemini CLI 0.34.0, and Codex CLI 0.116.0.
+> **Note**: commitlog-ai reads the local log files that each agent writes to disk. If your agent version is too old and uses a different log format, parsing may fail. The versions above are the earliest known to produce compatible logs. Tested with Claude Code 2.1.79, Gemini CLI 0.34.0, and Codex CLI 0.116.0.
 
 ## Features
 
@@ -59,12 +59,12 @@ aitrace serve            # Open web UI at localhost:3100
 
 ## Commands
 
-### `aitrace status`
+### `commitlog-ai status`
 
 Show detected log sources and counts for the current project.
 
 ```
-$ aitrace status
+$ commitlog-ai status
 Project: /Users/you/dev/myproject
 
   claude_code   3 log file(s)
@@ -72,42 +72,42 @@ Project: /Users/you/dev/myproject
   codex_cli     2 log file(s)
 ```
 
-### `aitrace parse`
+### `commitlog-ai parse`
 
-Parse all detected agent logs into a unified JSON format. Secrets are automatically masked. Output is written to `.aitrace/sessions.json`. Results are cached and only re-parsed when source files change or the parser version is updated.
+Parse all detected agent logs into a unified JSON format. Secrets are automatically masked. Output is written to `.commitlog-ai/sessions.json`. Results are cached and only re-parsed when source files change or the parser version is updated.
 
 ```
-$ aitrace parse
+$ commitlog-ai parse
 [claude_code] Found 3 log file(s)
   Session a1b2c3d4: 42 messages (09:15:30 to 10:22:45)
   Session e5f6g7h8: 18 messages (14:00:12 to 14:35:20)
 
-Parsed 2 session(s) → .aitrace/sessions.json
+Parsed 2 session(s) → .commitlog-ai/sessions.json
 ```
 
 Options:
 - `--force` — Ignore cache and re-parse all logs
 
-### `aitrace link`
+### `commitlog-ai link`
 
-Match parsed sessions to git commits using timestamp-based heuristics. Output is written to `.aitrace/timeline.json`. Results are cached and only re-linked when sessions.json changes or new commits are detected.
+Match parsed sessions to git commits using timestamp-based heuristics. Output is written to `.commitlog-ai/timeline.json`. Results are cached and only re-linked when sessions.json changes or new commits are detected.
 
 ```
-$ aitrace link
+$ commitlog-ai link
 Found 2 session(s) and 28 commit(s)
-Linked 2 pair(s), 28 total entries → .aitrace/timeline.json
+Linked 2 pair(s), 28 total entries → .commitlog-ai/timeline.json
 ```
 
 Options:
 - `--force` — Ignore cache and re-link
 
-### `aitrace serve`
+### `commitlog-ai serve`
 
 Start a local web server to browse the linked timeline. If the default port is in use, an available port is automatically selected.
 
 ```
-$ aitrace serve
-aitrace server running at http://localhost:3100
+$ commitlog-ai serve
+commitlog-ai server running at http://localhost:3100
   28 timeline entries, 2 sessions
 ```
 
@@ -116,18 +116,18 @@ Options:
 - `--port <number>` — Server port (default: 3100, auto-fallback if busy)
 - `--no-browser` — Don't open browser automatically
 
-### `aitrace export`
+### `commitlog-ai export`
 
 Export the linked timeline as JSON or Markdown.
 
 ```bash
 # JSON bundle
-aitrace export --format json
-Exported → .aitrace/output/timeline.json
+commitlog-ai export --format json
+Exported → .commitlog-ai/output/timeline.json
 
 # Markdown report (single file with all conversations)
-aitrace export --format markdown
-Exported → .aitrace/output/timeline.md
+commitlog-ai export --format markdown
+Exported → .commitlog-ai/output/timeline.md
 ```
 
 Options:
@@ -136,7 +136,7 @@ Options:
 
 ## How Matching Works
 
-aitrace links sessions to commits using a confidence-scored algorithm:
+commitlog-ai links sessions to commits using a confidence-scored algorithm:
 
 1. **Time overlap** — Commit timestamp falls within session time range → 90% confidence
 2. **Post-session commit** — Commit within 5 minutes after session ends → 70% confidence
@@ -169,8 +169,8 @@ The web viewer provides four views:
 
 - **Go CLI** — Single binary, zero external dependencies (no database, no Docker)
 - **React SPA** — Built with Vite + TypeScript + Tailwind CSS v4 + shadcn/ui, embedded into the Go binary via `go:embed`
-- **JSON-based** — All data stored as JSON files in `.aitrace/`, portable and git-friendly. Loaded into memory at serve time with server-side pagination.
-- **Caching** — File modification time + size for parse cache, git HEAD hash for link cache. Cache metadata stored in `.aitrace/cache.json`. Parser version changes invalidate all caches.
+- **JSON-based** — All data stored as JSON files in `.commitlog-ai/`, portable and git-friendly. Loaded into memory at serve time with server-side pagination.
+- **Caching** — File modification time + size for parse cache, git HEAD hash for link cache. Cache metadata stored in `.commitlog-ai/cache.json`. Parser version changes invalidate all caches.
 - **Hot Reload** — `serve --build` uses `sync.RWMutex` to safely swap data while API handlers continue serving requests
 - **Secret Sanitizer** — Regex-based detection and masking of API keys, tokens, and credentials before any file is written
 
@@ -180,17 +180,17 @@ The web viewer provides four views:
 # Build everything (web + Go)
 cd web && npm run build && cd ..
 rm -rf internal/server/dist && cp -r web/dist internal/server/dist
-go build -o bin/aitrace ./cmd/aitrace/
+go build -o bin/commitlog-ai ./cmd/commitlog-ai/
 
 # Development: run Vite dev server + Go API separately
 cd web && npm run dev          # Vite on :5173 (proxies /api to :3100)
-go run ./cmd/aitrace/ serve    # Go API on :3100
+go run ./cmd/commitlog-ai/ serve    # Go API on :3100
 ```
 
 ### Project Structure
 
 ```
-cmd/aitrace/           CLI entry point and subcommands
+cmd/commitlog-ai/           CLI entry point and subcommands
 internal/
   model/               Unified data types (Session, Message, Timeline)
   parser/              Log parsers (Claude Code, Gemini CLI, Codex CLI)

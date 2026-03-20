@@ -1,10 +1,10 @@
 # Build artifacts
 bin/
-aitrace
+commitlog-ai
 *.exe
 
 # Parsed data (may contain secrets from agent logs)
-.aitrace/
+.commitlog-ai/
 
 # Embedded SPA dist (built from web/)
 internal/server/dist/

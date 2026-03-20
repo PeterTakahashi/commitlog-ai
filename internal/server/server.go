@@ -13,8 +13,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/anthropics/aitrace/internal/linker"
-	"github.com/anthropics/aitrace/internal/model"
+	"github.com/anthropics/commitlog-ai/internal/linker"
+	"github.com/anthropics/commitlog-ai/internal/model"
 )
 
 // Server serves the React UI and API endpoints.
@@ -42,10 +42,10 @@ func New(projectDir string, port int, staticFS fs.FS) *Server {
 
 func (s *Server) loadData() error {
 	// Load timeline
-	timelinePath := filepath.Join(s.ProjectDir, ".aitrace", "timeline.json")
+	timelinePath := filepath.Join(s.ProjectDir, ".commitlog-ai", "timeline.json")
 	data, err := os.ReadFile(timelinePath)
 	if err != nil {
-		return fmt.Errorf("no timeline found. Run 'aitrace parse && aitrace link' first: %w", err)
+		return fmt.Errorf("no timeline found. Run 'commitlog-ai parse && commitlog-ai link' first: %w", err)
 	}
 
 	var timeline model.LinkedTimeline
@@ -130,7 +130,7 @@ func (s *Server) Start() error {
 	}
 
 	addr := fmt.Sprintf("localhost:%d", s.Port)
-	fmt.Printf("aitrace server running at http://%s\n", addr)
+	fmt.Printf("commitlog-ai server running at http://%s\n", addr)
 	fmt.Printf("  %d timeline entries, %d sessions\n", len(s.timeline.Entries), len(s.sessions))
 
 	if s.OnReady != nil {

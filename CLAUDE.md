@@ -1,8 +1,8 @@
-# aitrace - Development Guide for Claude Code
+# commitlog-ai - Development Guide for Claude Code
 
 ## Project Overview
 
-aitrace is a Go CLI + React SPA that connects AI coding agent conversations (Claude Code, Gemini CLI, Codex CLI) to git commit history. Single binary, zero external dependencies.
+commitlog-ai is a Go CLI + React SPA that connects AI coding agent conversations (Claude Code, Gemini CLI, Codex CLI) to git commit history. Single binary, zero external dependencies.
 
 ## Tech Stack
 
@@ -16,33 +16,33 @@ aitrace is a Go CLI + React SPA that connects AI coding agent conversations (Cla
 # Full rebuild (always do this after frontend changes)
 cd web && npm run build && cd ..
 rm -rf internal/server/dist && cp -r web/dist internal/server/dist
-go build -o bin/aitrace ./cmd/aitrace/
+go build -o bin/commitlog-ai ./cmd/commitlog-ai/
 
 # Go only (backend changes, no frontend changes)
-go build -o bin/aitrace ./cmd/aitrace/
+go build -o bin/commitlog-ai ./cmd/commitlog-ai/
 
 # Frontend type check
 cd web && npx tsc --noEmit
 
 # Test the binary
-./bin/aitrace status
-./bin/aitrace parse
-./bin/aitrace link
-./bin/aitrace serve --no-browser
-./bin/aitrace serve --build --no-browser
-./bin/aitrace export --format markdown
+./bin/commitlog-ai status
+./bin/commitlog-ai parse
+./bin/commitlog-ai link
+./bin/commitlog-ai serve --no-browser
+./bin/commitlog-ai serve --build --no-browser
+./bin/commitlog-ai export --format markdown
 ```
 
 ## Project Structure
 
 ```
-cmd/aitrace/
+cmd/commitlog-ai/
   main.go              Root cobra command
-  cmd_parse.go         `aitrace parse` - runs parser, sanitizes secrets, writes .aitrace/sessions.json (--force to bypass cache)
-  cmd_link.go          `aitrace link` - matches sessions to git commits, sanitizes, writes .aitrace/timeline.json (--force to bypass cache)
-  cmd_serve.go         `aitrace serve` - starts HTTP server with embedded React SPA (--build for auto parse+link+rebuild)
-  cmd_export.go        `aitrace export` - exports as JSON or Markdown
-  cmd_status.go        `aitrace status` - shows detected log sources
+  cmd_parse.go         `commitlog-ai parse` - runs parser, sanitizes secrets, writes .commitlog-ai/sessions.json (--force to bypass cache)
+  cmd_link.go          `commitlog-ai link` - matches sessions to git commits, sanitizes, writes .commitlog-ai/timeline.json (--force to bypass cache)
+  cmd_serve.go         `commitlog-ai serve` - starts HTTP server with embedded React SPA (--build for auto parse+link+rebuild)
+  cmd_export.go        `commitlog-ai export` - exports as JSON or Markdown
+  cmd_status.go        `commitlog-ai status` - shows detected log sources
 
 internal/
   model/
@@ -63,7 +63,7 @@ internal/
     builder.go         Unified parse+link logic with caching for serve --build. Exports Build(projectDir) → Result
 
   cache/
-    cache.go           Parse/link caching. ParseCache checks file size+mtime+parser version. LinkCache checks sessions.json mtime+git HEAD+parser version. Stored in .aitrace/cache.json
+    cache.go           Parse/link caching. ParseCache checks file size+mtime+parser version. LinkCache checks sessions.json mtime+git HEAD+parser version. Stored in .commitlog-ai/cache.json
 
   exporter/
     json.go            JSON export
@@ -97,9 +97,9 @@ web/
 
 ## Key Architecture Decisions
 
-- **No database**: JSON files in `.aitrace/` are loaded into memory at serve time. Server-side pagination via Go slices. This keeps `go install` working without CGO/SQLite.
+- **No database**: JSON files in `.commitlog-ai/` are loaded into memory at serve time. Server-side pagination via Go slices. This keeps `go install` working without CGO/SQLite.
 - **Default port 3100**: Changed from 3000 to avoid conflicts with common dev servers. Auto-fallback via `net.Listen("tcp", "localhost:0")` if busy.
-- **Caching**: File modification time + size for parse cache, git HEAD hash for link cache. Cache metadata in `.aitrace/cache.json`. Parser version (`ParserVersion` in `parser.go`) change invalidates all caches. Parse invalidation also clears link cache.
+- **Caching**: File modification time + size for parse cache, git HEAD hash for link cache. Cache metadata in `.commitlog-ai/cache.json`. Parser version (`ParserVersion` in `parser.go`) change invalidates all caches. Parse invalidation also clears link cache.
 - **serve --build**: Runs `builder.Build()` at startup, then polls `git rev-parse HEAD` every 2 seconds in a goroutine. On HEAD change: rebuild + `server.ReloadData()`. Uses `sync.RWMutex` so API handlers continue serving during reload.
 - **Git log format**: Uses `%B` (full commit body) instead of `%s` (subject only) with `%x01` as record separator to support multi-line commit messages.
 - **Session segmentation**: Long sessions are split by commit boundaries with minimum 4 messages per segment. Segments can overlap backwards for context.
