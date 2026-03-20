@@ -153,7 +153,17 @@ The web viewer provides four views:
 - **Timeline** — A git-log-style list with infinite scroll, server-side pagination, agent filter, and search by commit hash or message. Each entry shows the commit author's GitHub avatar, name, and file change stats.
 - **Session Detail** — Split view with the conversation segment on the left (showing the commit author's name instead of "You") and the git diff on the right. Tool approval messages are shown inline with the approved tool name.
 - **Full Session** — Complete conversation for an entire session with a separate tab showing all code changes across every linked commit with collapsible diffs.
-- **Stats** — Dashboard showing session counts by agent, link status breakdown, and message totals
+- **Stats** — Dashboard showing session counts by agent, diff and token stats by agent, and link status breakdown.
+
+### Screenshots
+
+| Timeline | Session Detail |
+|----------|---------------|
+| ![Timeline](docs/img/timeline.png) | ![Session Detail](docs/img/session-detail.png) |
+
+| Full Session | Stats |
+|-------------|-------|
+| ![Full Session](docs/img/session-full.png) | ![Stats](docs/img/stats.png) |
 
 ## Architecture
 
