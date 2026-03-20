@@ -8,11 +8,13 @@ type LinkedTimeline struct {
 	GitRepo string          `json:"git_repo"`
 }
 
-// TimelineEntry pairs a git commit with an agent session.
+// TimelineEntry pairs a git commit with an agent session (or a segment of one).
 type TimelineEntry struct {
-	Commit         *GitCommit `json:"commit,omitempty"`
-	Session        *Session   `json:"session,omitempty"`
-	LinkConfidence float64    `json:"link_confidence"`
+	Commit           *GitCommit `json:"commit,omitempty"`
+	Session          *Session   `json:"session,omitempty"`
+	LinkConfidence   float64    `json:"link_confidence"`
+	MessageStartIdx  int        `json:"message_start_idx"` // inclusive, for segmented view
+	MessageEndIdx    int        `json:"message_end_idx"`   // exclusive, for segmented view
 }
 
 // GitCommit holds metadata about a single git commit.

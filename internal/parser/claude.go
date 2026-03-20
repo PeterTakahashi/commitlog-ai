@@ -69,6 +69,14 @@ type claudeMessage struct {
 	Role    string               `json:"role"`
 	Model   string               `json:"model"`
 	Content []claudeContentBlock `json:"content"`
+	Usage   *claudeUsage         `json:"usage,omitempty"`
+}
+
+type claudeUsage struct {
+	InputTokens              int `json:"input_tokens"`
+	OutputTokens             int `json:"output_tokens"`
+	CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+	CacheReadInputTokens     int `json:"cache_read_input_tokens"`
 }
 
 type claudeContentBlock struct {
@@ -184,6 +192,15 @@ func (p *ClaudeParser) Parse(path string) ([]model.Session, error) {
 		}
 		if role == "assistant" {
 			m.ToolCalls = toolCalls
+			m.Model = msg.Model
+			if msg.Usage != nil {
+				m.Usage = &model.TokenUsage{
+					InputTokens:              msg.Usage.InputTokens,
+					OutputTokens:             msg.Usage.OutputTokens,
+					CacheCreationInputTokens: msg.Usage.CacheCreationInputTokens,
+					CacheReadInputTokens:     msg.Usage.CacheReadInputTokens,
+				}
+			}
 		}
 		messages = append(messages, m)
 	}

@@ -13,6 +13,8 @@ export function SessionDetailPage() {
   const commitHash = searchParams.get("commit");
 
   const authorName = searchParams.get("author") || "You";
+  const msgStart = searchParams.get("start");
+  const msgEnd = searchParams.get("end");
 
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -20,11 +22,15 @@ export function SessionDetailPage() {
   useEffect(() => {
     if (!id) return;
     setLoading(true);
-    fetchSession(id)
+    const opts =
+      msgStart != null && msgEnd != null
+        ? { start: Number(msgStart), end: Number(msgEnd) }
+        : undefined;
+    fetchSession(id, opts)
       .then(setSession)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, msgStart, msgEnd]);
 
   if (loading) {
     return (
@@ -43,6 +49,32 @@ export function SessionDetailPage() {
   }
 
   const hasDiff = !!commitHash;
+
+  // Compute token usage totals
+  const tokenTotals = (session.messages ?? []).reduce(
+    (acc, msg) => {
+      if (msg.usage) {
+        acc.input += msg.usage.input_tokens;
+        acc.output += msg.usage.output_tokens;
+        acc.cacheCreation += msg.usage.cache_creation_input_tokens ?? 0;
+        acc.cacheRead += msg.usage.cache_read_input_tokens ?? 0;
+      }
+      return acc;
+    },
+    { input: 0, output: 0, cacheCreation: 0, cacheRead: 0 },
+  );
+  const totalTokens =
+    tokenTotals.input +
+    tokenTotals.output +
+    tokenTotals.cacheCreation +
+    tokenTotals.cacheRead;
+
+  // Find models used in this session
+  const modelsUsed = [
+    ...new Set(
+      (session.messages ?? []).map((m) => m.model).filter(Boolean) as string[],
+    ),
+  ];
 
   return (
     <div className="flex flex-col h-screen">
@@ -74,6 +106,51 @@ export function SessionDetailPage() {
           })}
         </div>
       </header>
+
+      {/* Token usage + model bar */}
+      {totalTokens > 0 && (
+        <div className="border-b border-border px-4 py-2 flex items-center gap-4 text-xs font-mono text-muted-foreground shrink-0 bg-muted/30">
+          {modelsUsed.map((m) => (
+            <span key={m} className="text-foreground font-medium">
+              {m}
+            </span>
+          ))}
+          <span>
+            Tokens:{" "}
+            <span className="text-foreground">
+              {formatTokenCount(totalTokens)}
+            </span>
+          </span>
+          <span>
+            In:{" "}
+            <span className="text-blue-400">
+              {formatTokenCount(tokenTotals.input)}
+            </span>
+          </span>
+          <span>
+            Out:{" "}
+            <span className="text-green-400">
+              {formatTokenCount(tokenTotals.output)}
+            </span>
+          </span>
+          {tokenTotals.cacheRead > 0 && (
+            <span>
+              Cache read:{" "}
+              <span className="text-yellow-400">
+                {formatTokenCount(tokenTotals.cacheRead)}
+              </span>
+            </span>
+          )}
+          {tokenTotals.cacheCreation > 0 && (
+            <span>
+              Cache write:{" "}
+              <span className="text-orange-400">
+                {formatTokenCount(tokenTotals.cacheCreation)}
+              </span>
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Content */}
       {hasDiff ? (
@@ -164,4 +241,10 @@ function formatDuration(start: string, end: string): string {
   if (mins < 60) return `${mins}m`;
   const hrs = Math.floor(mins / 60);
   return `${hrs}h ${mins % 60}m`;
+}
+
+function formatTokenCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
 }

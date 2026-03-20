@@ -20,8 +20,17 @@ export async function fetchTimeline(params: {
   return res.json();
 }
 
-export async function fetchSession(id: string): Promise<Session> {
-  const res = await fetch(`${BASE}/sessions/${id}`);
+export async function fetchSession(
+  id: string,
+  opts?: { start?: number; end?: number },
+): Promise<Session> {
+  const sp = new URLSearchParams();
+  if (opts?.start != null && opts?.end != null) {
+    sp.set("start", String(opts.start));
+    sp.set("end", String(opts.end));
+  }
+  const qs = sp.toString();
+  const res = await fetch(`${BASE}/sessions/${id}${qs ? `?${qs}` : ""}`);
   if (!res.ok) throw new Error(`Failed to fetch session: ${res.statusText}`);
   return res.json();
 }

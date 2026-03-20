@@ -230,6 +230,22 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Support message range slicing for segmented sessions
+	q := r.URL.Query()
+	startStr := q.Get("start")
+	endStr := q.Get("end")
+
+	if startStr != "" && endStr != "" {
+		start, _ := strconv.Atoi(startStr)
+		end, _ := strconv.Atoi(endStr)
+		if start >= 0 && end > start && end <= len(session.Messages) {
+			sliced := *session
+			sliced.Messages = session.Messages[start:end]
+			writeJSON(w, sliced)
+			return
+		}
+	}
+
 	writeJSON(w, session)
 }
 

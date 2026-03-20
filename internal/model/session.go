@@ -22,10 +22,20 @@ type Agent struct {
 
 // Message is one turn in a conversation.
 type Message struct {
-	Role      string     `json:"role"`      // "human" | "assistant"
-	Content   string     `json:"content"`
-	Timestamp time.Time  `json:"timestamp"`
-	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
+	Role      string      `json:"role"`      // "human" | "assistant"
+	Content   string      `json:"content"`
+	Timestamp time.Time   `json:"timestamp"`
+	ToolCalls []ToolCall  `json:"tool_calls,omitempty"`
+	Usage     *TokenUsage `json:"usage,omitempty"`
+	Model     string      `json:"model,omitempty"`
+}
+
+// TokenUsage holds token consumption for a single assistant message.
+type TokenUsage struct {
+	InputTokens              int `json:"input_tokens"`
+	OutputTokens             int `json:"output_tokens"`
+	CacheCreationInputTokens int `json:"cache_creation_input_tokens,omitempty"`
+	CacheReadInputTokens     int `json:"cache_read_input_tokens,omitempty"`
 }
 
 // ToolCall records a tool invocation by the assistant.

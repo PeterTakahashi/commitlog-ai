@@ -6,8 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const AGENT_LABELS: Record<string, { label: string; color: string }> = {
   claude_code: { label: "Claude", color: "bg-orange-500" },
-  gemini_cli: { label: "Gemini", color: "bg-blue-500" },
-  codex_cli: { label: "Codex", color: "bg-green-500" },
 };
 
 export function StatsPage() {
@@ -22,11 +20,19 @@ export function StatsPage() {
   }, []);
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen text-muted-foreground">Loading...</div>;
+    return (
+      <div className="flex items-center justify-center h-screen text-muted-foreground">
+        Loading...
+      </div>
+    );
   }
 
   if (!stats) {
-    return <div className="flex items-center justify-center h-screen text-muted-foreground">No stats available</div>;
+    return (
+      <div className="flex items-center justify-center h-screen text-muted-foreground">
+        No stats available
+      </div>
+    );
   }
 
   const totalByAgent = Object.values(stats.by_agent).reduce((a, b) => a + b, 0);
@@ -34,7 +40,10 @@ export function StatsPage() {
   return (
     <div className="min-h-screen p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
-        <Link to="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+        <Link
+          to="/"
+          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
           &larr; Back
         </Link>
         <h1 className="text-xl font-bold font-mono">Stats</h1>
@@ -55,13 +64,18 @@ export function StatsPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           {Object.entries(stats.by_agent).map(([agent, count]) => {
-            const config = AGENT_LABELS[agent] ?? { label: agent, color: "bg-zinc-500" };
+            const config = AGENT_LABELS[agent] ?? {
+              label: agent,
+              color: "bg-zinc-500",
+            };
             const pct = totalByAgent > 0 ? (count / totalByAgent) * 100 : 0;
             return (
               <div key={agent} className="space-y-1">
                 <div className="flex justify-between text-sm">
                   <span>{config.label}</span>
-                  <span className="font-mono text-muted-foreground">{count} ({Math.round(pct)}%)</span>
+                  <span className="font-mono text-muted-foreground">
+                    {count} ({Math.round(pct)}%)
+                  </span>
                 </div>
                 <div className="h-2 rounded-full bg-muted overflow-hidden">
                   <div
@@ -83,15 +97,21 @@ export function StatsPage() {
         <CardContent>
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
-              <div className="text-2xl font-bold font-mono text-green-500">{stats.linked}</div>
+              <div className="text-2xl font-bold font-mono text-green-500">
+                {stats.linked}
+              </div>
               <div className="text-xs text-muted-foreground">Linked</div>
             </div>
             <div>
-              <div className="text-2xl font-bold font-mono text-muted-foreground">{stats.commit_only}</div>
+              <div className="text-2xl font-bold font-mono text-muted-foreground">
+                {stats.commit_only}
+              </div>
               <div className="text-xs text-muted-foreground">Commit Only</div>
             </div>
             <div>
-              <div className="text-2xl font-bold font-mono text-muted-foreground">{stats.session_only}</div>
+              <div className="text-2xl font-bold font-mono text-muted-foreground">
+                {stats.session_only}
+              </div>
               <div className="text-xs text-muted-foreground">Session Only</div>
             </div>
           </div>

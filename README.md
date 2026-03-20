@@ -2,21 +2,21 @@
 
 > See the prompts behind every git commit.
 
-**aitrace** connects your AI coding agent conversations to your git history, giving your team a complete picture of AI-assisted development.
+**aitrace** connects your Claude Code conversations to your git history, giving your team a complete picture of AI-assisted development.
 
 ## The Problem
 
-You use AI coding agents daily — Claude Code, Gemini CLI, Codex CLI. But `git log` only shows *what* changed, not *why*, not *which prompt*, not *which model*. Each agent stores logs in different locations with different formats, and none of them link back to git.
+You use Claude Code daily. But `git log` only shows *what* changed, not *why*, not *which prompt*, not *which model*. Agent logs are buried in hidden directories with no link back to git.
 
 ## The Solution
 
-aitrace reads agent logs from all three tools, converts them into a unified format, matches them to git commits by timestamp, and serves a beautiful web UI to browse it all.
+aitrace reads Claude Code logs, converts them into a unified format, matches them to git commits by timestamp, and serves a web UI to browse it all. API keys and secrets found in logs are automatically masked before output.
 
 ```
-Agent Logs ──▶ aitrace parse ──▶ aitrace link ──▶ aitrace serve
-                                                       │
-                                              localhost:3000
-                                         Timeline + Conversations + Diffs
+Claude Code Logs ──▶ aitrace parse ──▶ aitrace link ──▶ aitrace serve
+                                                             │
+                                                    localhost:3000
+                                           Timeline + Conversations + Diffs
 ```
 
 ## Quick Start
@@ -25,7 +25,7 @@ Agent Logs ──▶ aitrace parse ──▶ aitrace link ──▶ aitrace serv
 go install github.com/anthropics/aitrace@latest
 
 cd your-project
-aitrace parse        # Read agent logs → unified format
+aitrace parse        # Read Claude Code logs → unified format
 aitrace link         # Match sessions to git commits
 aitrace serve        # Open web UI at localhost:3000
 ```
@@ -35,8 +35,14 @@ aitrace serve        # Open web UI at localhost:3000
 | Agent | Status | Log Location |
 |-------|--------|-------------|
 | Claude Code | Supported | `~/.claude/projects/` |
-| Gemini CLI | Supported | `~/.gemini/tmp/` |
-| Codex CLI | Supported | `~/.codex/sessions/` |
+
+## Features
+
+- **API Key Masking** — Secrets (OpenAI, Anthropic, AWS, Azure, GitHub tokens, etc.) are automatically detected and masked in all output files
+- **Git Author Info** — Each commit shows author name, email, and GitHub profile icon in the web UI
+- **Auto Port Fallback** — If port 3000 is busy, an available port is automatically selected
+- **Server-side Pagination** — Handles repositories with thousands of commits efficiently
+- **Markdown Export** — Export the full timeline as a single Markdown file
 
 ## Commands
 
@@ -49,23 +55,19 @@ $ aitrace status
 Project: /Users/you/dev/myproject
 
   claude_code   3 log file(s)
-  gemini_cli    1 log file(s)
-  codex_cli     12 log file(s)
 ```
 
 ### `aitrace parse`
 
-Parse all detected agent logs into a unified JSON format. Output is written to `.aitrace/sessions.json`.
+Parse all detected agent logs into a unified JSON format. Secrets are automatically masked. Output is written to `.aitrace/sessions.json`.
 
 ```
 $ aitrace parse
 [claude_code] Found 3 log file(s)
   Session a1b2c3d4: 42 messages (09:15:30 to 10:22:45)
   Session e5f6g7h8: 18 messages (14:00:12 to 14:35:20)
-[gemini_cli] Found 1 log file(s)
-  Session 713e58a6: 31 messages (16:18:18 to 17:07:49)
 
-Parsed 4 session(s) → .aitrace/sessions.json
+Parsed 2 session(s) → .aitrace/sessions.json
 ```
 
 ### `aitrace link`
@@ -74,8 +76,8 @@ Match parsed sessions to git commits using timestamp-based heuristics. Output is
 
 ```
 $ aitrace link
-Found 4 session(s) and 28 commit(s)
-Linked 3 pair(s), 29 total entries → .aitrace/timeline.json
+Found 2 session(s) and 28 commit(s)
+Linked 2 pair(s), 28 total entries → .aitrace/timeline.json
 ```
 
 ### `aitrace serve`
@@ -85,7 +87,7 @@ Start a local web server to browse the linked timeline. If the default port is i
 ```
 $ aitrace serve
 aitrace server running at http://localhost:3000
-  29 timeline entries, 4 sessions
+  28 timeline entries, 2 sessions
 ```
 
 Options:
@@ -126,17 +128,16 @@ Unmatched commits and sessions are shown as standalone entries.
 
 The web viewer provides three views:
 
-- **Timeline** — A git-log-style list with infinite scroll and server-side pagination. Filterable by agent type, with full-text search across commit messages, hashes, project names, and model names.
-- **Session Detail** — Split view with the full conversation on the left and the git diff on the right
+- **Timeline** — A git-log-style list with infinite scroll, server-side pagination, agent filter, and full-text search. Each entry shows the commit author's GitHub avatar, name, and file change stats.
+- **Session Detail** — Split view with the full conversation on the left (showing the commit author's name instead of "You") and the git diff on the right. Tool approval messages are shown inline with the approved tool name.
 - **Stats** — Dashboard showing session counts by agent, link status breakdown, and message totals
-
-The API supports paginated responses (`/api/timeline?page=1&page_size=50&agent=claude_code&q=search`) to handle repositories with thousands of commits efficiently.
 
 ## Architecture
 
 - **Go CLI** — Single binary, zero external dependencies (no database, no Docker)
 - **React SPA** — Built with Vite + TypeScript + Tailwind CSS v4 + shadcn/ui, embedded into the Go binary via `go:embed`
-- **JSON-based** — All data stored as JSON files in `.aitrace/`, portable and git-friendly. Loaded into memory at serve time with server-side pagination (no SQLite needed).
+- **JSON-based** — All data stored as JSON files in `.aitrace/`, portable and git-friendly. Loaded into memory at serve time with server-side pagination.
+- **Secret Sanitizer** — Regex-based detection and masking of API keys, tokens, and credentials before any file is written
 
 ## Development
 
@@ -157,9 +158,10 @@ go run ./cmd/aitrace/ serve    # Go API on :3000
 cmd/aitrace/           CLI entry point and subcommands
 internal/
   model/               Unified data types (Session, Message, Timeline)
-  parser/              Agent-specific log parsers (Claude, Gemini, Codex)
+  parser/              Claude Code log parser
   linker/              Git operations and timestamp-based matching
   exporter/            JSON and Markdown export
+  sanitizer/           API key and secret masking
   server/              HTTP server with embedded React SPA + paginated API
 web/                   React viewer (Vite + TypeScript + Tailwind + shadcn/ui)
 ```

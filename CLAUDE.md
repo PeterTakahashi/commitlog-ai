@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-aitrace is a Go CLI + React SPA that connects AI agent conversations (Claude Code, Gemini CLI, Codex CLI) to git commit history. Single binary, zero external dependencies.
+aitrace is a Go CLI + React SPA that connects Claude Code conversations to git commit history. Single binary, zero external dependencies.
 
 ## Tech Stack
 
@@ -37,8 +37,8 @@ cd web && npx tsc --noEmit
 ```
 cmd/aitrace/
   main.go              Root cobra command
-  cmd_parse.go         `aitrace parse` - runs all parsers, writes .aitrace/sessions.json
-  cmd_link.go          `aitrace link` - matches sessions to git commits, writes .aitrace/timeline.json
+  cmd_parse.go         `aitrace parse` - runs parser, sanitizes secrets, writes .aitrace/sessions.json
+  cmd_link.go          `aitrace link` - matches sessions to git commits, sanitizes, writes .aitrace/timeline.json
   cmd_serve.go         `aitrace serve` - starts HTTP server with embedded React SPA
   cmd_export.go        `aitrace export` - exports as JSON or Markdown
   cmd_status.go        `aitrace status` - shows detected log sources
@@ -46,39 +46,41 @@ cmd/aitrace/
 internal/
   model/
     session.go         Core types: Session, Agent, Message, ToolCall
-    timeline.go        Core types: LinkedTimeline, TimelineEntry, GitCommit
+    timeline.go        Core types: LinkedTimeline, TimelineEntry, GitCommit (includes AuthorEmail)
 
   parser/
-    parser.go          Parser interface (Name, Detect, Parse)
+    parser.go          Parser interface (Name, Detect, Parse) + AllParsers()
     claude.go          Claude Code parser (~/.claude/projects/<hash>/<uuid>.jsonl)
-    gemini.go          Gemini CLI parser (~/.gemini/tmp/<hash>/chats/session-*.json)
-    codex.go           Codex CLI parser (~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl)
 
   linker/
-    git.go             Git CLI wrapper (git log, git diff --numstat, git diff)
+    git.go             Git CLI wrapper (git log with %H%aI%an%ae%s, git diff --numstat, git diff)
     matcher.go         Timestamp-based matching algorithm with confidence scoring
 
   exporter/
     json.go            JSON export
-    markdown.go        Markdown export (single file with all conversations)
+    markdown.go        Markdown export (rune-aware truncation for multibyte safety)
+
+  sanitizer/
+    sanitizer.go       API key/secret detection and masking (OpenAI, Anthropic, AWS, Azure, GitHub, Bearer, etc.)
 
   server/
-    server.go          HTTP server: paginated /api/timeline, /api/sessions/:id, /api/commits/:hash/diff, /api/stats
+    server.go          HTTP server: paginated /api/timeline, /api/sessions/:id, /api/commits/:hash/diff, /api/stats, /api/avatar
     embed.go           go:embed for React dist files
 
 web/
   src/
-    lib/types.ts       TypeScript types matching Go model (Session, TimelineEntry, PaginatedTimeline, etc.)
-    lib/api.ts         API client with pagination params
+    lib/types.ts       TypeScript types matching Go model (Session, TimelineEntry, GitCommit with author_email, etc.)
+    lib/api.ts         API client with pagination params + avatar cache
     pages/
       TimelinePage.tsx      Main view with infinite scroll, search, agent filter
-      SessionDetailPage.tsx Split view: conversation + diff
+      SessionDetailPage.tsx Split view: conversation + diff, passes author name from URL params
       StatsPage.tsx         Stats dashboard
     components/
-      TimelineList.tsx      Timeline entries grouped by date
-      AgentBadge.tsx        Agent type badge (Claude=orange, Gemini=blue, Codex=green)
+      TimelineList.tsx      Timeline entries grouped by date, with author avatar
+      AuthorAvatar.tsx      GitHub avatar via /api/avatar (Gravatar fallback) + initials fallback
+      AgentBadge.tsx        Agent type badge (Claude=orange)
       ConfidenceDot.tsx     Match confidence indicator
-      ConversationView.tsx  Chat-style message display
+      ConversationView.tsx  Chat-style display: human label from commit author, tool approval detection, empty message filtering
       ToolCallBlock.tsx     Expandable tool call display
       DiffViewer.tsx        GitHub-style diff viewer
 ```
@@ -86,31 +88,23 @@ web/
 ## Key Architecture Decisions
 
 - **No database**: JSON files in `.aitrace/` are loaded into memory at serve time. Server-side pagination via Go slices. This keeps `go install` working without CGO/SQLite.
-- **Auto port fallback**: If default port 3000 is busy, server auto-selects a free port.
+- **Auto port fallback**: If default port 3000 is busy, server auto-selects a free port via `net.Listen("tcp", "localhost:0")`.
 - **Dark mode**: Applied via `document.documentElement.classList.add("dark")` in App.tsx. Must be on `<html>`, not a wrapper `<div>`.
-- **JSONL buffer size**: Claude/Codex parsers use 10MB scanner buffer for large log lines.
-- **Codex user messages**: `response_item` with `role: "user"` contains system prompts. Real user input comes from `event_msg` with `type: "user_message"`.
-- **go:embed workflow**: `web/dist/` must be copied to `internal/server/dist/` before `go build`. The `internal/server/dist/` directory should be in `.gitignore`.
+- **JSONL buffer size**: Claude parser uses 10MB scanner buffer for large log lines.
+- **Rune-aware truncation**: Markdown export truncates by `[]rune` count, not byte count, to avoid splitting multibyte UTF-8 characters.
+- **Secret sanitization**: Applied in both `cmd_parse.go` and `cmd_link.go` before writing any file. Important: when making new slices from old slices, save the original reference before `make()` to avoid iterating over zeroed data.
+- **go:embed workflow**: `web/dist/` must be copied to `internal/server/dist/` before `go build`. The `internal/server/dist/` directory is in `.gitignore`.
+- **Avatar resolution**: Server tries GitHub user search API first, falls back to Gravatar (identicon). Results cached in `sync.Map`.
+- **Author name in conversation**: Passed via URL search param `?author=Name` from TimelineList to SessionDetailPage to ConversationView.
+- **Tool approval messages**: Empty human messages following an assistant tool call are displayed as compact "approved {tool_name}" indicators. Other empty messages are hidden.
 
-## Agent Log Formats
+## Agent Log Format
 
 ### Claude Code (`~/.claude/projects/<project-hash>/<session-uuid>.jsonl`)
 - JSONL, one JSON per line
 - Key fields: `type` ("user"|"assistant"), `sessionId`, `timestamp`, `message.content` (array of content blocks), `message.model`, `isSidechain`
 - Tool uses in assistant content blocks (`type: "tool_use"`), tool results in next user message (`type: "tool_result"`, matched by `tool_use_id`)
-
-### Gemini CLI (`~/.gemini/tmp/<projectHash>/chats/session-*.json`)
-- Single JSON file per session
-- Root: `{sessionId, startTime, lastUpdated, messages: [...]}`
-- Message types: "user" | "gemini"
-- Tool calls inline in gemini messages: `toolCalls[].{name, args, result[].functionResponse.response.output}`
-
-### Codex CLI (`~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`)
-- JSONL with typed entries: `session_meta`, `response_item`, `event_msg`, `turn_context`
-- `session_meta` has git info (commit_hash, branch, repository_url)
-- `turn_context` has model name
-- `event_msg.type: "user_message"` has actual user input
-- `response_item.type: "function_call"` + `"function_call_output"` paired by `call_id`
+- Skip entries with `isSidechain: true` (subagent logs)
 
 ## API Endpoints
 
@@ -126,6 +120,9 @@ GET /api/commits/:hash/diff
 
 GET /api/stats
     → {total_entries, total_sessions, total_messages, by_agent, linked, commit_only, session_only}
+
+GET /api/avatar?email=user@example.com
+    → {avatar_url: "https://..."}
 ```
 
 ## Common Tasks
@@ -142,3 +139,6 @@ Edit `internal/linker/matcher.go` → `computeConfidence()` function
 1. Add handler in `internal/server/server.go`
 2. Register in `Start()` method's `mux.HandleFunc()`
 3. Update `web/src/lib/api.ts` and `web/src/lib/types.ts`
+
+### Adding new secret patterns
+Add regex to `secretPatterns` slice in `internal/sanitizer/sanitizer.go`

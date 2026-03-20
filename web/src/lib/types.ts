@@ -1,5 +1,5 @@
 export interface Agent {
-  tool: "claude_code" | "gemini_cli" | "codex_cli";
+  tool: "claude_code";
   model: string;
 }
 
@@ -9,11 +9,20 @@ export interface ToolCall {
   output?: string;
 }
 
+export interface TokenUsage {
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
+}
+
 export interface Message {
   role: "human" | "assistant";
   content: string;
   timestamp: string;
   tool_calls?: ToolCall[];
+  usage?: TokenUsage;
+  model?: string;
 }
 
 export interface Session {
@@ -43,6 +52,8 @@ export interface TimelineEntry {
   commit?: GitCommit;
   session?: Session;
   link_confidence: number;
+  message_start_idx?: number;
+  message_end_idx?: number;
 }
 
 export interface LinkedTimeline {

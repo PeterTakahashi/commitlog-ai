@@ -58,13 +58,25 @@ function TimelineEntryRow({ entry }: { entry: TimelineEntry }) {
   const hasLink = commit && session;
   const commitOnly = commit && !session;
 
+  // Build URL with message range params for segmented sessions
+  const buildSessionUrl = () => {
+    if (!session) return "#";
+    const params = new URLSearchParams();
+    if (commit) {
+      params.set("commit", commit.hash);
+      params.set("author", commit.author);
+    }
+    if (entry.message_start_idx != null && entry.message_end_idx != null) {
+      params.set("start", String(entry.message_start_idx));
+      params.set("end", String(entry.message_end_idx));
+    }
+    const qs = params.toString();
+    return `/session/${session.id}${qs ? `?${qs}` : ""}`;
+  };
+
   return (
     <Link
-      to={
-        session
-          ? `/session/${session.id}${commit ? `?commit=${commit.hash}&author=${encodeURIComponent(commit.author)}` : ""}`
-          : "#"
-      }
+      to={buildSessionUrl()}
       className="group flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors relative"
     >
       {/* Timeline dot + line */}
@@ -103,6 +115,12 @@ function TimelineEntryRow({ entry }: { entry: TimelineEntry }) {
             <span className="text-xs text-muted-foreground font-mono">
               {formatTime(session.started_at)}
             </span>
+            {entry.message_start_idx != null &&
+              entry.message_end_idx != null && (
+                <span className="text-xs text-muted-foreground/70 font-mono">
+                  ({entry.message_end_idx - entry.message_start_idx} msgs)
+                </span>
+              )}
           </div>
         )}
 
