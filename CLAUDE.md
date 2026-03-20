@@ -30,6 +30,8 @@ cd web && npx tsc --noEmit
 ./bin/commitlog-ai link
 ./bin/commitlog-ai serve --no-browser
 ./bin/commitlog-ai serve --build --no-browser
+./bin/commitlog-ai serve --build -d          # daemon mode
+./bin/commitlog-ai stop                      # stop daemon
 ./bin/commitlog-ai export --format markdown
 ```
 
@@ -40,7 +42,8 @@ cmd/commitlog-ai/
   main.go              Root cobra command
   cmd_parse.go         `commitlog-ai parse` - runs parser, sanitizes secrets, writes .commitlog-ai/sessions.json (--force to bypass cache)
   cmd_link.go          `commitlog-ai link` - matches sessions to git commits, sanitizes, writes .commitlog-ai/timeline.json (--force to bypass cache)
-  cmd_serve.go         `commitlog-ai serve` - starts HTTP server with embedded React SPA (--build for auto parse+link+rebuild)
+  cmd_serve.go         `commitlog-ai serve` - starts HTTP server with embedded React SPA (--build for auto parse+link+rebuild, -d for daemon mode)
+  cmd_stop.go          `commitlog-ai stop` - stops a background server started with serve -d
   cmd_export.go        `commitlog-ai export` - exports as JSON or Markdown
   cmd_status.go        `commitlog-ai status` - shows detected log sources
 
@@ -56,14 +59,17 @@ internal/
     codex.go           Codex CLI parser (~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl + legacy .json)
 
   linker/
-    git.go             Git CLI wrapper (git log with %H%aI%an%ae%B using %x01 separator, git diff --numstat, git diff, GetHead)
+    git.go             Git CLI wrapper (git log with %H%aI%an%ae%B using %x01 separator, git diff --numstat, git diff, GetHead, GetUserName, GetBranches, GetBranchCommitHashes)
     matcher.go         Timestamp-based matching algorithm with confidence scoring + session segmentation by commit
 
   builder/
-    builder.go         Unified parse+link logic with caching for serve --build. Exports Build(projectDir) → Result
+    builder.go         Unified parse+link logic with caching and progress reporting. Exports Build(projectDir) and BuildWithProgress(projectDir, ProgressFunc) → Result
 
   cache/
-    cache.go           Parse/link caching. ParseCache checks file size+mtime+parser version. LinkCache checks sessions.json mtime+git HEAD+parser version. Stored in .commitlog-ai/cache.json
+    cache.go           Parse/link caching. ParseCache checks file size+mtime+parser version. LinkCache checks []FileInfo (multiple per-user session files)+git HEAD+parser version. Stored in .commitlog-ai/cache.json
+
+  userpath/
+    userpath.go        Per-user session path utilities: SanitizeName, UserSessionsDir, UserSessionsPath, ReadAllSessions (merges all sessions/*/sessions.json), MigrateLegacy (moves old single sessions.json to per-user dir)
 
   exporter/
     json.go            JSON export
@@ -73,7 +79,7 @@ internal/
     sanitizer.go       API key/secret detection and masking (OpenAI, Anthropic, AWS, Azure, GitHub, Bearer, etc.)
 
   server/
-    server.go          HTTP server with sync.RWMutex for hot reload, ReloadData() method, paginated API endpoints
+    server.go          HTTP server with sync.RWMutex for hot reload, ReloadData() method, paginated API endpoints, /api/branches, branch filter on /api/timeline
     embed.go           go:embed for React dist files
 
 web/
@@ -107,7 +113,11 @@ web/
 - **JSONL buffer size**: Claude parser uses 10MB scanner buffer for large log lines.
 - **Rune-aware truncation**: Markdown export truncates by `[]rune` count, not byte count, to avoid splitting multibyte UTF-8 characters.
 - **Secret sanitization**: Applied in both `cmd_parse.go` and `cmd_link.go` before writing any file. Important: when making new slices from old slices, save the original reference before `make()` to avoid iterating over zeroed data.
-- **go:embed workflow**: `web/dist/` must be copied to `internal/server/dist/` before `go build`. The `internal/server/dist/` directory is in `.gitignore`.
+- **go:embed workflow**: `web/dist/` must be copied to `internal/server/dist/` before `go build`. The `internal/server/dist/` directory is committed to git (required for `go install` to work).
+- **Per-user sessions**: Session data stored in `.commitlog-ai/sessions/<username>/sessions.json` (username from `git config user.name`, sanitized). Avoids merge conflicts in team workflows. `ReadAllSessions()` merges all per-user session files. Legacy single `sessions.json` is auto-migrated on first `parse`.
+- **Daemon mode**: `serve -d` re-execs the binary in background with `--no-browser`. PID stored in `.commitlog-ai/server.pid`. `stop` command sends SIGTERM.
+- **Branch filtering**: `/api/branches` returns all branches via `git branch -a`. `/api/timeline?branch=<name>` filters by commit hash set from `git log <branch> --format=%H`.
+- **Build progress**: `BuildWithProgress(projectDir, ProgressFunc)` reports step name + current/total for terminal progress bar.
 - **Avatar resolution**: Server tries GitHub user search API first, falls back to Gravatar (identicon). Results cached in `sync.Map`.
 - **Author name in conversation**: Passed via URL search param `?author=Name` from TimelineList to SessionDetailPage to ConversationView.
 - **Tool approval messages**: Empty human messages following an assistant tool call are displayed as compact "approved {tool_name}" indicators. Other empty messages are hidden.
@@ -137,9 +147,9 @@ web/
 ## API Endpoints
 
 ```
-GET /api/timeline?page=1&page_size=50&agent=claude_code&q=search
+GET /api/timeline?page=1&page_size=50&agent=claude_code&q=search&branch=main
     → PaginatedTimeline {entries, git_repo, total, page, page_size, has_more}
-    Search matches commit hash and commit message
+    Search matches commit hash and commit message. Branch filter uses commit hash set.
 
 GET /api/sessions/:id?start=0&end=10
     → Session (with full or sliced messages for segmented views)
@@ -151,7 +161,10 @@ GET /api/commits/:hash/diff
     → {diff: "...full diff text..."}
 
 GET /api/stats
-    → {total_entries, total_sessions, total_messages, by_agent, linked, commit_only, session_only}
+    → {total_entries, total_sessions, total_messages, by_agent, linked, commit_only, session_only, diff_by_agent, token_by_agent}
+
+GET /api/branches
+    → {branches: ["main", "feature/foo", "origin/main", ...]}
 
 GET /api/avatar?email=user@example.com
     → {avatar_url: "https://..."}

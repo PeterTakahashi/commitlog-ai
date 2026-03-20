@@ -22,14 +22,18 @@ Agent Logs ──▶ commitlog-ai parse ──▶ commitlog-ai link ──▶ co
 ## Quick Start
 
 ```bash
-go install github.com/PeterTakahashi/commitlog-ai@latest
+go install github.com/PeterTakahashi/commitlog-ai/cmd/commitlog-ai@latest
 
 cd your-project
 
 # Option 1: All-in-one (recommended)
 commitlog-ai serve --build    # Parse + link + serve, auto-rebuilds on new commits
 
-# Option 2: Step by step
+# Option 2: Background daemon
+commitlog-ai serve --build -d # Same as above, but runs in background
+commitlog-ai stop             # Stop the background server
+
+# Option 3: Step by step
 commitlog-ai parse            # Read agent logs → unified format
 commitlog-ai link             # Match sessions to git commits
 commitlog-ai serve            # Open web UI at localhost:3100
@@ -47,7 +51,10 @@ commitlog-ai serve            # Open web UI at localhost:3100
 
 ## Features
 
-- **`serve --build`** — One command does everything: parse, link, serve, and auto-rebuild when new git commits are detected (2-second polling)
+- **`serve --build`** — One command does everything: parse, link, serve, and auto-rebuild when new git commits are detected (2-second polling). Shows a progress bar during build.
+- **`serve -d` / `stop`** — Run the server as a background daemon with `-d`, stop it with `commitlog-ai stop`
+- **Team Sync** — Session data is stored per-user (`sessions/<user>/sessions.json`), so multiple developers can commit to git without merge conflicts. On `link`, all team members' sessions are merged automatically.
+- **Branch Filtering** — Filter the timeline by git branch in the web UI
 - **Caching** — Parse and link results are cached; only rebuilds when source files change, new commits appear, or parser version is updated. Use `--force` to bypass.
 - **API Key Masking** — Secrets (OpenAI, Anthropic, AWS, Azure, GitHub tokens, etc.) are automatically detected and masked in all output files
 - **Git Author Info** — Each commit shows author name, email, and GitHub profile icon in the web UI
@@ -113,8 +120,18 @@ commitlog-ai server running at http://localhost:3100
 
 Options:
 - `--build` — Run parse+link before serving and auto-rebuild on new git commits
+- `-d, --daemon` — Run server in background (use `commitlog-ai stop` to stop)
 - `--port <number>` — Server port (default: 3100, auto-fallback if busy)
 - `--no-browser` — Don't open browser automatically
+
+### `commitlog-ai stop`
+
+Stop a background server started with `serve -d`.
+
+```
+$ commitlog-ai stop
+Server stopped (PID 12345)
+```
 
 ### `commitlog-ai export`
 
@@ -150,7 +167,7 @@ Unmatched commits and sessions are shown as standalone entries.
 
 The web viewer provides four views:
 
-- **Timeline** — A git-log-style list with infinite scroll, server-side pagination, agent filter, and search by commit hash or message. Each entry shows the commit author's GitHub avatar, name, and file change stats.
+- **Timeline** — A git-log-style list with infinite scroll, server-side pagination, agent filter, branch filter, and search by commit hash or message. Each entry shows the commit author's GitHub avatar, name, and file change stats.
 - **Session Detail** — Split view with the conversation segment on the left (showing the commit author's name instead of "You") and the git diff on the right. Tool approval messages are shown inline with the approved tool name.
 - **Full Session** — Complete conversation for an entire session with a separate tab showing all code changes across every linked commit with collapsible diffs.
 - **Stats** — Dashboard showing session counts by agent, diff and token stats by agent, and link status breakdown.
@@ -164,6 +181,28 @@ The web viewer provides four views:
 | Full Session | Stats |
 |-------------|-------|
 | ![Full Session](docs/img/session-full.png) | ![Stats](docs/img/stats.png) |
+
+## Team Sync
+
+commitlog-ai supports multi-developer workflows out of the box. Session data is stored in per-user directories to avoid merge conflicts:
+
+```
+.commitlog-ai/
+  sessions/
+    petertakahashi/sessions.json    ← Your sessions
+    alicejohnson/sessions.json      ← Teammate's sessions (via git pull)
+  timeline.json                     ← Local only (.gitignore)
+  cache.json                        ← Local only (.gitignore)
+```
+
+To enable team sync:
+
+1. Commit `.commitlog-ai/sessions/` to git (it's not gitignored by default)
+2. Each developer runs `commitlog-ai parse` to write their own sessions
+3. `commitlog-ai link` reads all team members' sessions and matches them to git commits
+4. The web UI shows everyone's sessions — you can see which prompts led to each commit
+
+User identification is based on `git config user.name` (sanitized to a directory-safe name).
 
 ## Architecture
 
@@ -195,10 +234,11 @@ internal/
   model/               Unified data types (Session, Message, Timeline)
   parser/              Log parsers (Claude Code, Gemini CLI, Codex CLI)
   linker/              Git operations and timestamp-based matching
-  builder/             Unified parse+link logic for serve --build
+  builder/             Unified parse+link logic with progress reporting
   cache/               Parse/link caching with parser version invalidation
   exporter/            JSON and Markdown export
   sanitizer/           API key and secret masking
+  userpath/            Per-user session paths and team sync utilities
   server/              HTTP server with embedded React SPA + paginated API
 web/                   React viewer (Vite + TypeScript + Tailwind + shadcn/ui)
 ```
