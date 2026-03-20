@@ -9,7 +9,7 @@
     "cwd": "/Users/apple/dev/claude-code/aitrace",
     "git_branch": "HEAD",
     "started_at": "2026-03-19T16:14:48.941Z",
-    "ended_at": "2026-03-20T10:53:27.552Z",
+    "ended_at": "2026-03-20T10:54:18.669Z",
     "messages": [
       {
         "role": "human",
@@ -29873,7 +29873,8 @@
         "tool_calls": [
           {
             "tool": "mcp__acp__Bash",
-            "input": "{\"command\":\"cd /Users/apple/dev/claude-code/aitrace \\u0026\\u0026 bin/commitlog-ai serve --build -d --port 3350 --no-browser 2\\u003e\\u00261\",\"description\":\"Start server to verify UI\",\"timeout\":45000}"
+            "input": "{\"command\":\"cd /Users/apple/dev/claude-code/aitrace \\u0026\\u0026 bin/commitlog-ai serve --build -d --port 3350 --no-browser 2\\u003e\\u00261\",\"description\":\"Start server to verify UI\",\"timeout\":45000}",
+            "output": "Exited with code 0.Final output:\n\ncommitlog-ai server started in background (PID 17693, port 3350)\nRun 'commitlog-ai stop' to stop the server.\n\n\n"
           }
         ],
         "usage": {
@@ -29881,6 +29882,107 @@
           "output_tokens": 1,
           "cache_creation_input_tokens": 712,
           "cache_read_input_tokens": 129994
+        },
+        "model": "claude-opus-4-6"
+      },
+      {
+        "role": "human",
+        "content": "",
+        "timestamp": "2026-03-20T10:53:44.756Z"
+      },
+      {
+        "role": "assistant",
+        "content": "",
+        "timestamp": "2026-03-20T10:53:51.401Z",
+        "tool_calls": [
+          {
+            "tool": "mcp__acp__Bash",
+            "input": "{\"command\":\"sleep 3 \\u0026\\u0026 curl -s http://localhost:3350/api/timeline?page=1\\\\\\u0026page_size=5 | python3 -c \\\"\\nimport json,sys\\ndata=json.load(sys.stdin)\\nfor e in data['entries'][:5]:\\n    h = e.get('commit',{}).get('hash','')[:7] if e.get('commit') else 'no-commit'\\n    m = e.get('manual_commit', False)\\n    msg = e.get('commit',{}).get('message','').split(chr(10))[0][:50] if e.get('commit') else ''\\n    print(f'{h} manual={m} {msg}')\\n\\\"\",\"description\":\"Verify API returns manual_commit\",\"timeout\":15000}",
+            "output": "Exited with code 0.Final output:\n\n6101848 manual=False ブラウザを開く**:\nd8303e6 manual=True remove unused files\na04acd3 manual=False update docs\n20b25cb manual=False プログレスバーを表示\n3c600d1 manual=False Commit embedded frontend dist for go install suppo\n"
+          }
+        ],
+        "usage": {
+          "input_tokens": 3,
+          "output_tokens": 1,
+          "cache_creation_input_tokens": 572,
+          "cache_read_input_tokens": 130706
+        },
+        "model": "claude-opus-4-6"
+      },
+      {
+        "role": "human",
+        "content": "",
+        "timestamp": "2026-03-20T10:53:54.576Z"
+      },
+      {
+        "role": "assistant",
+        "content": "APIレスポンスに`manual_commit`が正しく含まれています。`d8303e6`が`manual=True`。",
+        "timestamp": "2026-03-20T10:53:58.801Z",
+        "usage": {
+          "input_tokens": 1,
+          "output_tokens": 1,
+          "cache_creation_input_tokens": 373,
+          "cache_read_input_tokens": 131278
+        },
+        "model": "claude-opus-4-6"
+      },
+      {
+        "role": "assistant",
+        "content": "",
+        "timestamp": "2026-03-20T10:53:59.215Z",
+        "tool_calls": [
+          {
+            "tool": "mcp__acp__Bash",
+            "input": "{\"command\":\"cd /Users/apple/dev/claude-code/aitrace \\u0026\\u0026 bin/commitlog-ai stop 2\\u003e\\u00261\",\"description\":\"Stop test server\",\"timeout\":10000}",
+            "output": "Exited with code 0.Final output:\n\nServer stopped (PID 17693)\n\n\n\n\n"
+          }
+        ],
+        "usage": {
+          "input_tokens": 1,
+          "output_tokens": 1,
+          "cache_creation_input_tokens": 373,
+          "cache_read_input_tokens": 131278
+        },
+        "model": "claude-opus-4-6"
+      },
+      {
+        "role": "human",
+        "content": "",
+        "timestamp": "2026-03-20T10:53:59.383Z"
+      },
+      {
+        "role": "assistant",
+        "content": "",
+        "timestamp": "2026-03-20T10:54:03.856Z",
+        "tool_calls": [
+          {
+            "tool": "TodoWrite",
+            "input": "{\"todos\":[{\"activeForm\":\"Adding ManualCommit field to TimelineEntry model\",\"content\":\"Add ManualCommit field to TimelineEntry model\",\"status\":\"completed\"},{\"activeForm\":\"Adding manual commit detection to matcher.go\",\"content\":\"Add manual commit detection to matcher.go\",\"status\":\"completed\"},{\"activeForm\":\"Updating Web UI to show manual commit indicator\",\"content\":\"Update Web UI to show manual commit indicator\",\"status\":\"completed\"},{\"activeForm\":\"Building and testing\",\"content\":\"Build and test\",\"status\":\"completed\"}]}",
+            "output": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable"
+          }
+        ],
+        "usage": {
+          "input_tokens": 1,
+          "output_tokens": 25,
+          "cache_creation_input_tokens": 191,
+          "cache_read_input_tokens": 131651
+        },
+        "model": "claude-opus-4-6"
+      },
+      {
+        "role": "human",
+        "content": "",
+        "timestamp": "2026-03-20T10:54:03.858Z"
+      },
+      {
+        "role": "assistant",
+        "content": "実装完了です。\n\n**変更内容:**\n\n- **`internal/model/timeline.go`** — `TimelineEntry` に `ManualCommit bool` フィールドを追加\n- **`internal/linker/matcher.go`** — `isManualCommit()` 関数を追加。コミットの変更ファイルとセッションセグメント内のツールコールのファイルパスを比較し、オーバーラップがゼロなら `manual_commit: true`\n- **`web/src/lib/types.ts`** — `manual_commit?: boolean` を追加\n- **`web/src/components/TimelineList.tsx`** — `manual_commit` が true の場合、AgentBadge の代わりに青い「Manual」バッジを表示\n\n**判定ロジック:**\n- セッション中のツールコール（`write`, `edit`, `bash`等）からファイルパスを抽出\n- コミットの `ChangedFiles` と照合\n- ファイルオーバーラップがゼロ → AIがそのファイルを触っていない → 手動コミットと判定",
+        "timestamp": "2026-03-20T10:54:18.669Z",
+        "usage": {
+          "input_tokens": 1,
+          "output_tokens": 1,
+          "cache_creation_input_tokens": 227,
+          "cache_read_input_tokens": 131842
         },
         "model": "claude-opus-4-6"
       }

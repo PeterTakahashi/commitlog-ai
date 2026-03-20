@@ -32,7 +32,10 @@ commitlog-ai serve --build    # Parse + link + serve, auto-rebuilds on new commi
 # Option 2: Background daemon
 commitlog-ai serve --build -d # Same as above, but runs in background
 commitlog-ai stop             # Stop the background server
+```
 
+
+```bash
 # Option 3: Step by step
 commitlog-ai parse            # Read agent logs → unified format
 commitlog-ai link             # Match sessions to git commits
