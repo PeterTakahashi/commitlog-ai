@@ -1,6 +1,6 @@
 # Build artifacts
 bin/
-commitlog-ai
+/commitlog-ai
 *.exe
 
 # Generated data (local, derived from sessions + git log)
