@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -40,16 +41,40 @@ func init() {
 	rootCmd.AddCommand(serveCmd)
 }
 
+// pidInfo is stored in server.pid as JSON.
+type pidInfo struct {
+	PID  int `json:"pid"`
+	Port int `json:"port"`
+}
+
 func pidFilePath(projectDir string) string {
 	return filepath.Join(projectDir, ".commitlog-ai", "server.pid")
 }
 
-func writePID(projectDir string, pid int) error {
+func writePIDInfo(projectDir string, pid, port int) error {
 	pidPath := pidFilePath(projectDir)
 	if err := os.MkdirAll(filepath.Dir(pidPath), 0755); err != nil {
 		return err
 	}
-	return os.WriteFile(pidPath, []byte(strconv.Itoa(pid)), 0644)
+	data, _ := json.Marshal(pidInfo{PID: pid, Port: port})
+	return os.WriteFile(pidPath, data, 0644)
+}
+
+func readPIDInfo(projectDir string) (*pidInfo, error) {
+	data, err := os.ReadFile(pidFilePath(projectDir))
+	if err != nil {
+		return nil, err
+	}
+	var info pidInfo
+	if err := json.Unmarshal(data, &info); err != nil {
+		// Legacy format: plain PID number
+		pid, err2 := strconv.Atoi(strings.TrimSpace(string(data)))
+		if err2 != nil {
+			return nil, fmt.Errorf("invalid PID file")
+		}
+		return &pidInfo{PID: pid}, nil
+	}
+	return &info, nil
 }
 
 func removePID(projectDir string) {
@@ -82,14 +107,12 @@ func runServe(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Write PID file
-	writePID(absDir, os.Getpid())
-	defer removePID(absDir)
-
 	srv := server.New(absDir, servePort, server.EmbeddedStaticFS())
 
-	if !serveNoBrowser {
-		srv.OnReady = func(port int) {
+	srv.OnReady = func(port int) {
+		// Write PID file with actual port (after port fallback)
+		writePIDInfo(absDir, os.Getpid(), port)
+		if !serveNoBrowser {
 			openBrowser(fmt.Sprintf("http://localhost:%d", port))
 		}
 	}
@@ -99,6 +122,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		go watchCommits(absDir, srv)
 	}
 
+	defer removePID(absDir)
 	return srv.Start()
 }
 
@@ -109,12 +133,12 @@ func startDaemon(absDir string) error {
 	if serveProjectDir != "." {
 		childArgs = append(childArgs, "-p", serveProjectDir)
 	}
-	if servePort != 3100 {
-		childArgs = append(childArgs, "--port", strconv.Itoa(servePort))
-	}
+	// Always pass --port so child uses the same requested port
+	childArgs = append(childArgs, "--port", strconv.Itoa(servePort))
 	if serveBuild {
 		childArgs = append(childArgs, "--build")
 	}
+	// Child doesn't open browser; parent will open it after child is ready
 	childArgs = append(childArgs, "--no-browser")
 
 	executable, err := os.Executable()
@@ -133,11 +157,36 @@ func startDaemon(absDir string) error {
 		return fmt.Errorf("failed to start daemon: %w", err)
 	}
 
-	fmt.Printf("commitlog-ai server started in background (PID %d, port %d)\n", child.Process.Pid, servePort)
-	fmt.Println("Run 'commitlog-ai stop' to stop the server.")
+	childPID := child.Process.Pid
 
 	// Detach child process
 	child.Process.Release()
+
+	// Wait for server to be ready by polling the PID file
+	actualPort := servePort
+	ready := false
+	for i := 0; i < 60; i++ { // up to 30 seconds
+		time.Sleep(500 * time.Millisecond)
+		info, err := readPIDInfo(absDir)
+		if err == nil && info.Port > 0 {
+			actualPort = info.Port
+			ready = true
+			break
+		}
+	}
+
+	if !ready {
+		fmt.Printf("commitlog-ai server started in background (PID %d) but may still be building...\n", childPID)
+	} else {
+		fmt.Printf("commitlog-ai server started in background (PID %d, port %d)\n", childPID, actualPort)
+	}
+	fmt.Println("Run 'commitlog-ai stop' to stop the server.")
+
+	// Open browser with the actual port
+	if !serveNoBrowser {
+		openBrowser(fmt.Sprintf("http://localhost:%d", actualPort))
+	}
+
 	return nil
 }
 

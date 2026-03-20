@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"syscall"
 
 	"github.com/spf13/cobra"
@@ -32,29 +30,23 @@ func runStop(cmd *cobra.Command, args []string) error {
 	}
 
 	pidPath := pidFilePath(absDir)
-	data, err := os.ReadFile(pidPath)
+	info, err := readPIDInfo(absDir)
 	if err != nil {
 		return fmt.Errorf("no running server found (no PID file at %s)", pidPath)
 	}
 
-	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	process, err := os.FindProcess(info.PID)
 	if err != nil {
 		os.Remove(pidPath)
-		return fmt.Errorf("invalid PID file")
-	}
-
-	process, err := os.FindProcess(pid)
-	if err != nil {
-		os.Remove(pidPath)
-		return fmt.Errorf("process %d not found", pid)
+		return fmt.Errorf("process %d not found", info.PID)
 	}
 
 	if err := process.Signal(syscall.SIGTERM); err != nil {
 		os.Remove(pidPath)
-		return fmt.Errorf("failed to stop process %d: %w", pid, err)
+		return fmt.Errorf("failed to stop process %d: %w", info.PID, err)
 	}
 
 	os.Remove(pidPath)
-	fmt.Printf("Server stopped (PID %d)\n", pid)
+	fmt.Printf("Server stopped (PID %d)\n", info.PID)
 	return nil
 }
