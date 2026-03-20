@@ -23,7 +23,7 @@ func NewGitClient(repoDir string) *GitClient {
 // GetCommits returns all commits in reverse chronological order.
 func (g *GitClient) GetCommits() ([]model.GitCommit, error) {
 	// Use null byte separator to avoid issues with pipes in commit messages
-	cmd := exec.Command("git", "log", "--format=%H%x00%aI%x00%an%x00%s")
+	cmd := exec.Command("git", "log", "--format=%H%x00%aI%x00%an%x00%ae%x00%s")
 	cmd.Dir = g.RepoDir
 	out, err := cmd.Output()
 	if err != nil {
@@ -37,18 +37,19 @@ func (g *GitClient) GetCommits() ([]model.GitCommit, error) {
 		if line == "" {
 			continue
 		}
-		parts := strings.SplitN(line, "\x00", 4)
-		if len(parts) < 4 {
+		parts := strings.SplitN(line, "\x00", 5)
+		if len(parts) < 5 {
 			continue
 		}
 
 		ts, _ := time.Parse(time.RFC3339, parts[1])
 
 		commits = append(commits, model.GitCommit{
-			Hash:      parts[0],
-			Timestamp: ts,
-			Author:    parts[2],
-			Message:   parts[3],
+			Hash:        parts[0],
+			Timestamp:   ts,
+			Author:      parts[2],
+			AuthorEmail: parts[3],
+			Message:     parts[4],
 		})
 	}
 

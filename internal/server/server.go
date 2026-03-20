@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/anthropics/aitrace/internal/linker"
 	"github.com/anthropics/aitrace/internal/model"
@@ -24,6 +26,7 @@ type Server struct {
 	timeline   *model.LinkedTimeline
 	sessions   map[string]*model.Session
 	gitClient  *linker.GitClient
+	avatarCache sync.Map // email -> avatar URL
 }
 
 // New creates a new server instance.
@@ -76,6 +79,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/sessions/", s.handleSession)
 	mux.HandleFunc("/api/commits/", s.handleCommitDiff)
 	mux.HandleFunc("/api/stats", s.handleStats)
+	mux.HandleFunc("/api/avatar", s.handleAvatar)
 
 	// Static files (React SPA)
 	if s.StaticFS != nil {
@@ -281,6 +285,60 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	stats["session_only"] = sessionOnly
 
 	writeJSON(w, stats)
+}
+
+func (s *Server) handleAvatar(w http.ResponseWriter, r *http.Request) {
+	email := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("email")))
+	if email == "" {
+		http.Error(w, "email required", http.StatusBadRequest)
+		return
+	}
+
+	// Try GitHub avatar first by searching commit email via GitHub API
+	// Fall back to Gravatar which works universally
+	avatarURL := gravatarURL(email, 80)
+
+	// Try to resolve GitHub username from email (check cache first)
+	if cached, ok := s.avatarCache.Load(email); ok {
+		avatarURL = cached.(string)
+	} else {
+		// Try GitHub search API (unauthenticated, rate-limited)
+		ghURL := resolveGitHubAvatar(email)
+		if ghURL != "" {
+			avatarURL = ghURL
+		}
+		s.avatarCache.Store(email, avatarURL)
+	}
+
+	writeJSON(w, map[string]string{"avatar_url": avatarURL})
+}
+
+func gravatarURL(email string, size int) string {
+	hash := md5.Sum([]byte(strings.ToLower(strings.TrimSpace(email))))
+	return fmt.Sprintf("https://www.gravatar.com/avatar/%x?s=%d&d=identicon", hash, size)
+}
+
+func resolveGitHubAvatar(email string) string {
+	// Use GitHub's search API to find user by email
+	url := fmt.Sprintf("https://api.github.com/search/users?q=%s+in:email", email)
+	resp, err := http.Get(url)
+	if err != nil || resp.StatusCode != 200 {
+		return ""
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Items []struct {
+			AvatarURL string `json:"avatar_url"`
+		} `json:"items"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return ""
+	}
+	if len(result.Items) > 0 {
+		return result.Items[0].AvatarURL
+	}
+	return ""
 }
 
 func writeJSON(w http.ResponseWriter, data any) {

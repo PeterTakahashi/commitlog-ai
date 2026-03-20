@@ -132,10 +132,11 @@ func writeConversationSummary(b *strings.Builder, messages []model.Message) {
 		}
 
 		if msg.Content != "" {
-			// Truncate very long messages
+			// Truncate very long messages (rune-aware to avoid splitting multi-byte chars)
 			content := msg.Content
-			if len(content) > 2000 {
-				content = content[:2000] + "\n\n*(truncated)*"
+			runes := []rune(content)
+			if len(runes) > 2000 {
+				content = string(runes[:2000]) + "\n\n*(truncated)*"
 			}
 			b.WriteString(content)
 			b.WriteString("\n\n")

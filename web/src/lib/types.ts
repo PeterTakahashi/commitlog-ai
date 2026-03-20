@@ -30,6 +30,7 @@ export interface Session {
 export interface GitCommit {
   hash: string;
   author: string;
+  author_email: string;
   message: string;
   timestamp: string;
   files_changed: number;

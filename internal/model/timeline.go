@@ -19,6 +19,7 @@ type TimelineEntry struct {
 type GitCommit struct {
 	Hash         string    `json:"hash"`
 	Author       string    `json:"author"`
+	AuthorEmail  string    `json:"author_email"`
 	Message      string    `json:"message"`
 	Timestamp    time.Time `json:"timestamp"`
 	FilesChanged int       `json:"files_changed"`

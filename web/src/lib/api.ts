@@ -38,3 +38,20 @@ export async function fetchStats(): Promise<Stats> {
   if (!res.ok) throw new Error(`Failed to fetch stats: ${res.statusText}`);
   return res.json();
 }
+
+const avatarCache = new Map<string, string>();
+
+export async function fetchAvatar(email: string): Promise<string> {
+  if (avatarCache.has(email)) return avatarCache.get(email)!;
+  try {
+    const res = await fetch(
+      `${BASE}/avatar?email=${encodeURIComponent(email)}`,
+    );
+    if (!res.ok) return "";
+    const data = await res.json();
+    avatarCache.set(email, data.avatar_url);
+    return data.avatar_url;
+  } catch {
+    return "";
+  }
+}
