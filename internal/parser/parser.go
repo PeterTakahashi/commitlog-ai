@@ -3,7 +3,7 @@ package parser
 import "github.com/PeterTakahashi/commitlog-ai/internal/model"
 
 // ParserVersion is bumped when parser logic changes to invalidate caches.
-const ParserVersion = "2"
+const ParserVersion = "3"
 
 // Parser can detect and parse agent log files into unified sessions.
 type Parser interface {

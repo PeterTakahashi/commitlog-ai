@@ -66,10 +66,13 @@ type claudeEntry struct {
 }
 
 type claudeMessage struct {
-	Role    string               `json:"role"`
-	Model   string               `json:"model"`
-	Content []claudeContentBlock `json:"content"`
-	Usage   *claudeUsage         `json:"usage,omitempty"`
+	Role       string               `json:"role"`
+	Model      string               `json:"model"`
+	RawContent json.RawMessage      `json:"content"`
+	Content    []claudeContentBlock `json:"-"` // populated after custom unmarshal
+	Usage      *claudeUsage         `json:"usage,omitempty"`
+	// StringContent holds the text when content is a plain string (Claude Code terminal user prompts)
+	StringContent string `json:"-"`
 }
 
 type claudeUsage struct {
@@ -132,6 +135,23 @@ func (p *ClaudeParser) Parse(path string) ([]model.Session, error) {
 			continue
 		}
 
+		// content can be a string (user prompt in terminal Claude Code) or an array of content blocks
+		if len(msg.RawContent) > 0 {
+			if msg.RawContent[0] == '"' {
+				// String content – user typed prompt
+				var s string
+				if err := json.Unmarshal(msg.RawContent, &s); err == nil {
+					msg.StringContent = s
+				}
+			} else if msg.RawContent[0] == '[' {
+				// Array content – normal content blocks
+				var blocks []claudeContentBlock
+				if err := json.Unmarshal(msg.RawContent, &blocks); err == nil {
+					msg.Content = blocks
+				}
+			}
+		}
+
 		if msg.Model != "" {
 			agentModel = msg.Model
 		}
@@ -140,6 +160,11 @@ func (p *ClaudeParser) Parse(path string) ([]model.Session, error) {
 
 		var textParts []string
 		var toolCalls []model.ToolCall
+
+		// If content was a plain string, use it directly
+		if msg.StringContent != "" {
+			textParts = append(textParts, msg.StringContent)
+		}
 
 		for _, block := range msg.Content {
 			switch block.Type {
