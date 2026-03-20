@@ -42,6 +42,19 @@ commitlog-ai link             # Match sessions to git commits
 commitlog-ai serve            # Open web UI at localhost:3100
 ```
 
+### .gitignore
+
+Add the following to your `.gitignore`. These files are generated locally and do not need to be committed:
+
+```gitignore
+.commitlog-ai/cache.json
+.commitlog-ai/timeline.json
+.commitlog-ai/server.pid
+.commitlog-ai/output/
+```
+
+**Do NOT ignore `.commitlog-ai/sessions/`** — committing it allows your team to share AI session logs via git. See [Team Sync](#team-sync) for details.
+
 ## Supported Agents
 
 | Agent | Status | Minimum Version | Log Location |

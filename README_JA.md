@@ -42,6 +42,19 @@ commitlog-ai link             # セッションとgitコミットを紐づけ
 commitlog-ai serve            # Web UIを起動 (localhost:3100)
 ```
 
+### .gitignore
+
+以下を `.gitignore` に追加してください。これらのファイルはローカルで生成されるもので、コミットする必要はありません:
+
+```gitignore
+.commitlog-ai/cache.json
+.commitlog-ai/timeline.json
+.commitlog-ai/server.pid
+.commitlog-ai/output/
+```
+
+**`.commitlog-ai/sessions/` はignoreしないでください** — コミットすることで、チーム内でAIセッションログをgit経由で共有できます。詳しくは[チーム同期](#チーム同期)を参照してください。
+
 ## 対応エージェント
 
 | エージェント | 対応状況 | 最低バージョン | ログの場所 |
