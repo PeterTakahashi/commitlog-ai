@@ -24,12 +24,25 @@ type Result struct {
 	LinkCached   bool
 }
 
+// ProgressFunc is called with (step description, current, total).
+// current=0,total=0 means indeterminate.
+type ProgressFunc func(step string, current, total int)
+
 // Build runs parse + link for the given project directory.
 // Uses cache to skip work when nothing changed.
 func Build(projectDir string) (*Result, error) {
+	return BuildWithProgress(projectDir, nil)
+}
+
+// BuildWithProgress runs parse + link with optional progress reporting.
+func BuildWithProgress(projectDir string, progress ProgressFunc) (*Result, error) {
+	if progress == nil {
+		progress = func(string, int, int) {}
+	}
 	result := &Result{}
 
 	// --- Parse phase ---
+	progress("Detecting log sources...", 0, 0)
 	parsers := parser.AllParsers()
 	type parserFiles struct {
 		parser parser.Parser
@@ -69,11 +82,19 @@ func Build(projectDir string) (*Result, error) {
 	// Check parse cache
 	c := cache.Load(projectDir)
 	if c.IsParseValid(parser.ParserVersion, allSourceFiles) {
+		progress("Parse: using cache", 1, 1)
 		result.ParseCached = true
 	} else {
 		var allSessions []model.Session
+		totalFiles := 0
+		for _, pf := range detected {
+			totalFiles += len(pf.files)
+		}
+		parsed := 0
 		for _, pf := range detected {
 			for _, f := range pf.files {
+				parsed++
+				progress("Parsing sessions...", parsed, totalFiles)
 				sessions, err := pf.parser.Parse(f)
 				if err != nil {
 					continue
@@ -108,6 +129,7 @@ func Build(projectDir string) (*Result, error) {
 	}
 
 	// --- Link phase ---
+	progress("Reading git history...", 0, 0)
 	gitHead, err := git.GetHead()
 	if err != nil {
 		return nil, fmt.Errorf("git rev-parse HEAD: %w", err)
@@ -124,6 +146,7 @@ func Build(projectDir string) (*Result, error) {
 	// Reload cache (UpdateParse may have changed it)
 	c = cache.Load(projectDir)
 	if c.IsLinkValid(parser.ParserVersion, sessionFiles, gitHead) {
+		progress("Link: using cache", 1, 1)
 		result.LinkCached = true
 		return result, nil
 	}
@@ -137,6 +160,7 @@ func Build(projectDir string) (*Result, error) {
 		return nil, fmt.Errorf("not a git repository: %w", err)
 	}
 
+	progress("Loading commits...", 0, 0)
 	commits, err := git.GetCommits()
 	if err != nil {
 		return nil, fmt.Errorf("getting git commits: %w", err)
@@ -144,6 +168,7 @@ func Build(projectDir string) (*Result, error) {
 
 	// Enrich with diff stats
 	for i := range commits {
+		progress("Analyzing diffs...", i+1, len(commits))
 		fc, add, del, files, err := git.GetDiffStats(commits[i].Hash)
 		if err != nil {
 			continue
@@ -154,6 +179,7 @@ func Build(projectDir string) (*Result, error) {
 		commits[i].ChangedFiles = files
 	}
 
+	progress("Matching sessions to commits...", 0, 0)
 	timeline := linker.Match(allSessions, commits)
 	timeline.GitRepo = repoRoot
 	timeline = sanitizer.SanitizeTimeline(timeline)
@@ -167,6 +193,7 @@ func Build(projectDir string) (*Result, error) {
 	}
 	result.EntryCount = len(timeline.Entries)
 
+	progress("Writing timeline...", 0, 0)
 	outData, err := json.MarshalIndent(timeline, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("marshaling timeline: %w", err)
@@ -179,5 +206,6 @@ func Build(projectDir string) (*Result, error) {
 	c.UpdateLink(parser.ParserVersion, sessionFiles, gitHead, timelinePath)
 	c.Save()
 
+	progress("Done", 1, 1)
 	return result, nil
 }

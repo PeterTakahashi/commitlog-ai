@@ -2,9 +2,12 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/PeterTakahashi/commitlog-ai/internal/builder"
@@ -25,6 +28,7 @@ var (
 	servePort       int
 	serveNoBrowser  bool
 	serveBuild      bool
+	serveDaemon     bool
 )
 
 func init() {
@@ -32,7 +36,24 @@ func init() {
 	serveCmd.Flags().IntVar(&servePort, "port", 3100, "Server port")
 	serveCmd.Flags().BoolVar(&serveNoBrowser, "no-browser", false, "Don't open browser automatically")
 	serveCmd.Flags().BoolVar(&serveBuild, "build", false, "Run parse+link before serving and auto-rebuild on new commits")
+	serveCmd.Flags().BoolVarP(&serveDaemon, "daemon", "d", false, "Run server in background")
 	rootCmd.AddCommand(serveCmd)
+}
+
+func pidFilePath(projectDir string) string {
+	return filepath.Join(projectDir, ".commitlog-ai", "server.pid")
+}
+
+func writePID(projectDir string, pid int) error {
+	pidPath := pidFilePath(projectDir)
+	if err := os.MkdirAll(filepath.Dir(pidPath), 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(pidPath, []byte(strconv.Itoa(pid)), 0644)
+}
+
+func removePID(projectDir string) {
+	os.Remove(pidFilePath(projectDir))
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
@@ -41,10 +62,15 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Daemon mode: re-exec ourselves in background
+	if serveDaemon {
+		return startDaemon(absDir)
+	}
+
 	// Initial build if --build flag is set
 	if serveBuild {
-		fmt.Println("Building...")
-		result, err := builder.Build(absDir)
+		result, err := builder.BuildWithProgress(absDir, printProgress)
+		fmt.Print("\r\033[K") // clear progress line
 		if err != nil {
 			return fmt.Errorf("build failed: %w", err)
 		}
@@ -55,6 +81,10 @@ func runServe(cmd *cobra.Command, args []string) error {
 				result.SessionCount, result.LinkedCount, result.EntryCount)
 		}
 	}
+
+	// Write PID file
+	writePID(absDir, os.Getpid())
+	defer removePID(absDir)
 
 	srv := server.New(absDir, servePort, server.EmbeddedStaticFS())
 
@@ -70,6 +100,59 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 
 	return srv.Start()
+}
+
+func startDaemon(absDir string) error {
+	// Build args for the child process, removing -d/--daemon
+	var childArgs []string
+	childArgs = append(childArgs, "serve")
+	if serveProjectDir != "." {
+		childArgs = append(childArgs, "-p", serveProjectDir)
+	}
+	if servePort != 3100 {
+		childArgs = append(childArgs, "--port", strconv.Itoa(servePort))
+	}
+	if serveBuild {
+		childArgs = append(childArgs, "--build")
+	}
+	childArgs = append(childArgs, "--no-browser")
+
+	executable, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("cannot find executable: %w", err)
+	}
+
+	child := exec.Command(executable, childArgs...)
+	child.Dir = absDir
+	// Detach from terminal
+	child.Stdout = nil
+	child.Stderr = nil
+	child.Stdin = nil
+
+	if err := child.Start(); err != nil {
+		return fmt.Errorf("failed to start daemon: %w", err)
+	}
+
+	fmt.Printf("commitlog-ai server started in background (PID %d, port %d)\n", child.Process.Pid, servePort)
+	fmt.Println("Run 'commitlog-ai stop' to stop the server.")
+
+	// Detach child process
+	child.Process.Release()
+	return nil
+}
+
+// printProgress renders a progress bar to the terminal.
+func printProgress(step string, current, total int) {
+	const barWidth = 30
+	if total <= 0 {
+		// Indeterminate: just show the step
+		fmt.Printf("\r\033[K  %s", step)
+		return
+	}
+	ratio := float64(current) / float64(total)
+	filled := int(ratio * barWidth)
+	bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
+	fmt.Printf("\r\033[K  %s [%s] %d/%d", step, bar, current, total)
 }
 
 func watchCommits(projectDir string, srv *server.Server) {
@@ -93,7 +176,7 @@ func watchCommits(projectDir string, srv *server.Server) {
 		}
 		lastHead = currentHead
 
-		fmt.Printf("New commit detected (%s), rebuilding...\n", currentHead[:7])
+		fmt.Printf("\nNew commit detected (%s), rebuilding...\n", currentHead[:7])
 		result, err := builder.Build(projectDir)
 		if err != nil {
 			fmt.Printf("Rebuild failed: %v\n", err)
