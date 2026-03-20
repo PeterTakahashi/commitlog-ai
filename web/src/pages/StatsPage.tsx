@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const AGENT_LABELS: Record<string, { label: string; color: string }> = {
   claude_code: { label: "Claude", color: "bg-orange-500" },
+  gemini_cli: { label: "Gemini", color: "bg-blue-500" },
+  codex_cli: { label: "Codex", color: "bg-green-500" },
 };
 
 export function StatsPage() {

@@ -10,6 +10,16 @@ const agentConfig: Record<
     color: "text-orange-400",
     bg: "bg-orange-500/15 border-orange-500/30",
   },
+  gemini_cli: {
+    label: "Gemini",
+    color: "text-blue-400",
+    bg: "bg-blue-500/15 border-blue-500/30",
+  },
+  codex_cli: {
+    label: "Codex",
+    color: "text-green-400",
+    bg: "bg-green-500/15 border-green-500/30",
+  },
 };
 
 export function AgentBadge({ agent }: { agent: Agent }) {

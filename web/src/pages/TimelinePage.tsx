@@ -9,6 +9,8 @@ const PAGE_SIZE = 50;
 const AGENT_FILTERS = [
   { value: "", label: "All" },
   { value: "claude_code", label: "Claude" },
+  { value: "gemini_cli", label: "Gemini" },
+  { value: "codex_cli", label: "Codex" },
 ];
 
 export function TimelinePage() {

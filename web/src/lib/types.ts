@@ -1,5 +1,5 @@
 export interface Agent {
-  tool: "claude_code";
+  tool: "claude_code" | "gemini_cli" | "codex_cli";
   model: string;
 }
 
