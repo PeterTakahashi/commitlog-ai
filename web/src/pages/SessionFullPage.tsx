@@ -206,35 +206,44 @@ function SessionChanges({ commits }: { commits: CommitWithDiff[] }) {
                 expandedCommit === commit.hash ? null : commit.hash,
               )
             }
-            className="w-full px-4 py-3 flex items-center gap-3 hover:bg-muted/50 transition-colors text-left"
+            className="w-full px-4 py-3 hover:bg-muted/50 transition-colors text-left"
           >
-            <span
-              className={`text-xs transition-transform ${expandedCommit === commit.hash ? "rotate-90" : ""}`}
-            >
-              &#9654;
-            </span>
-            <code className="text-xs text-muted-foreground font-mono shrink-0">
-              {commit.hash.slice(0, 7)}
-            </code>
-            <span className="text-sm font-medium text-foreground truncate flex-1">
-              {commit.message}
-            </span>
-            <span className="text-xs text-muted-foreground font-mono shrink-0">
-              {new Date(commit.timestamp).toLocaleTimeString("en-US", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
-            <span className="text-xs font-mono shrink-0">
-              {commit.files_changed} file
-              {commit.files_changed !== 1 ? "s" : ""}
-              {commit.additions > 0 && (
-                <span className="text-green-500 ml-1">+{commit.additions}</span>
-              )}
-              {commit.deletions > 0 && (
-                <span className="text-red-500 ml-1">-{commit.deletions}</span>
-              )}
-            </span>
+            <div className="flex items-center gap-3">
+              <span
+                className={`text-xs transition-transform ${expandedCommit === commit.hash ? "rotate-90" : ""}`}
+              >
+                &#9654;
+              </span>
+              <code className="text-xs text-muted-foreground font-mono shrink-0">
+                {commit.hash.slice(0, 7)}
+              </code>
+              <span className="text-sm font-medium text-foreground truncate flex-1">
+                {commit.message.split("\n")[0]}
+              </span>
+              <span className="text-xs text-muted-foreground font-mono shrink-0">
+                {new Date(commit.timestamp).toLocaleTimeString("en-US", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+              <span className="text-xs font-mono shrink-0">
+                {commit.files_changed} file
+                {commit.files_changed !== 1 ? "s" : ""}
+                {commit.additions > 0 && (
+                  <span className="text-green-500 ml-1">
+                    +{commit.additions}
+                  </span>
+                )}
+                {commit.deletions > 0 && (
+                  <span className="text-red-500 ml-1">-{commit.deletions}</span>
+                )}
+              </span>
+            </div>
+            {commit.message.includes("\n") && (
+              <div className="mt-1.5 ml-9 text-sm font-medium text-foreground whitespace-pre-line">
+                {commit.message.split("\n").slice(1).join("\n").trim()}
+              </div>
+            )}
           </button>
 
           {/* Expanded diff */}

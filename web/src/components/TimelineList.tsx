@@ -97,13 +97,20 @@ function TimelineEntryRow({ entry }: { entry: TimelineEntry }) {
       <div className="flex-1 min-w-0 space-y-1.5">
         {/* Commit info */}
         {commit && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <code className="text-xs text-muted-foreground font-mono">
-              {commit.hash.slice(0, 7)}
-            </code>
-            <span className="text-sm font-medium text-foreground truncate">
-              {commit.message}
-            </span>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <code className="text-xs text-muted-foreground font-mono">
+                {commit.hash.slice(0, 7)}
+              </code>
+              <span className="text-sm font-medium text-foreground truncate">
+                {commit.message.split("\n")[0]}
+              </span>
+            </div>
+            {commit.message.includes("\n") && (
+              <p className="mt-1 text-sm font-medium text-foreground whitespace-pre-line">
+                {commit.message.split("\n").slice(1).join("\n").trim()}
+              </p>
+            )}
           </div>
         )}
 

@@ -22,22 +22,24 @@ func NewGitClient(repoDir string) *GitClient {
 
 // GetCommits returns all commits in reverse chronological order.
 func (g *GitClient) GetCommits() ([]model.GitCommit, error) {
-	// Use null byte separator to avoid issues with pipes in commit messages
-	cmd := exec.Command("git", "log", "--format=%H%x00%aI%x00%an%x00%ae%x00%s")
+	// Use %x00 as field separator and %x01 as record separator.
+	// %B gives the full commit message (multi-line), so we can't use newline as record delimiter.
+	cmd := exec.Command("git", "log", "--format=%H%x00%aI%x00%an%x00%ae%x00%B%x01")
 	cmd.Dir = g.RepoDir
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("git log: %w", err)
 	}
 
-	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	records := strings.Split(string(out), "\x01")
 	var commits []model.GitCommit
 
-	for _, line := range lines {
-		if line == "" {
+	for _, record := range records {
+		record = strings.TrimSpace(record)
+		if record == "" {
 			continue
 		}
-		parts := strings.SplitN(line, "\x00", 5)
+		parts := strings.SplitN(record, "\x00", 5)
 		if len(parts) < 5 {
 			continue
 		}
@@ -49,7 +51,7 @@ func (g *GitClient) GetCommits() ([]model.GitCommit, error) {
 			Timestamp:   ts,
 			Author:      parts[2],
 			AuthorEmail: parts[3],
-			Message:     parts[4],
+			Message:     strings.TrimSpace(parts[4]),
 		})
 	}
 
