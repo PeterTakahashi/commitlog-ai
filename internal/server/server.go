@@ -92,6 +92,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/commits/", s.handleCommitDiff)
 	mux.HandleFunc("/api/sessions-commits/", s.handleSessionCommits)
 	mux.HandleFunc("/api/stats", s.handleStats)
+	mux.HandleFunc("/api/branches", s.handleBranches)
 	mux.HandleFunc("/api/avatar", s.handleAvatar)
 
 	// Static files (React SPA)
@@ -157,6 +158,7 @@ func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	agentFilter := q.Get("agent")
 	search := strings.ToLower(q.Get("q"))
+	branchFilter := q.Get("branch")
 
 	page, _ := strconv.Atoi(q.Get("page"))
 	if page < 1 {
@@ -167,11 +169,22 @@ func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
 		pageSize = 50
 	}
 
+	// Build branch hash set if filtering by branch
+	var branchHashes map[string]bool
+	if branchFilter != "" {
+		branchHashes, _ = s.gitClient.GetBranchCommitHashes(branchFilter)
+	}
+
 	// Filter
 	var filtered []model.TimelineEntry
 	for _, e := range s.timeline.Entries {
 		if agentFilter != "" {
 			if e.Session == nil || e.Session.Agent.Tool != agentFilter {
+				continue
+			}
+		}
+		if branchHashes != nil {
+			if e.Commit == nil || !branchHashes[e.Commit.Hash] {
 				continue
 			}
 		}
@@ -402,6 +415,15 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	stats["diff_by_agent"] = diffByAgent
 
 	writeJSON(w, stats)
+}
+
+func (s *Server) handleBranches(w http.ResponseWriter, r *http.Request) {
+	branches, err := s.gitClient.GetBranches()
+	if err != nil {
+		writeJSON(w, map[string]any{"branches": []string{}})
+		return
+	}
+	writeJSON(w, map[string]any{"branches": branches})
 }
 
 func (s *Server) handleAvatar(w http.ResponseWriter, r *http.Request) {

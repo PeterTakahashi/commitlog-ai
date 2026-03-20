@@ -22,9 +22,9 @@ type ParseCache struct {
 
 // LinkCache tracks input/output state for the link command.
 type LinkCache struct {
-	Sessions FileInfo `json:"sessions"`
-	GitHead  string   `json:"git_head"`
-	Output   FileInfo `json:"output"`
+	Sessions []FileInfo `json:"sessions"`
+	GitHead  string     `json:"git_head"`
+	Output   FileInfo   `json:"output"`
 }
 
 // FileInfo stores file identity for change detection.
@@ -98,7 +98,7 @@ func (c *Cache) IsParseValid(parserVersion string, sourceFiles []string) bool {
 }
 
 // IsLinkValid checks if the link cache is still valid.
-func (c *Cache) IsLinkValid(parserVersion string, sessionsPath string, gitHead string) bool {
+func (c *Cache) IsLinkValid(parserVersion string, sessionFiles []string, gitHead string) bool {
 	if c.meta.ParserVersion != parserVersion {
 		return false
 	}
@@ -111,10 +111,21 @@ func (c *Cache) IsLinkValid(parserVersion string, sessionsPath string, gitHead s
 		return false
 	}
 
-	// Check sessions.json matches
-	si := statFile(sessionsPath)
-	if si == nil || si.Size != c.meta.Link.Sessions.Size || si.ModTime != c.meta.Link.Sessions.ModTime {
+	// Check session files match exactly
+	currentInfos := statFiles(sessionFiles)
+	if len(currentInfos) != len(c.meta.Link.Sessions) {
 		return false
+	}
+
+	cached := make(map[string]FileInfo)
+	for _, fi := range c.meta.Link.Sessions {
+		cached[fi.Path] = fi
+	}
+	for _, fi := range currentInfos {
+		prev, ok := cached[fi.Path]
+		if !ok || prev.Size != fi.Size || prev.ModTime != fi.ModTime {
+			return false
+		}
 	}
 
 	// Check output file still exists and matches
@@ -137,10 +148,10 @@ func (c *Cache) UpdateParse(parserVersion string, sourceFiles []string, outputPa
 }
 
 // UpdateLink saves link cache metadata after a successful link.
-func (c *Cache) UpdateLink(parserVersion string, sessionsPath string, gitHead string, outputPath string) {
+func (c *Cache) UpdateLink(parserVersion string, sessionFiles []string, gitHead string, outputPath string) {
 	c.meta.ParserVersion = parserVersion
 	c.meta.Link = &LinkCache{
-		Sessions: *statFile(sessionsPath),
+		Sessions: statFiles(sessionFiles),
 		GitHead:  gitHead,
 		Output:   *statFile(outputPath),
 	}
