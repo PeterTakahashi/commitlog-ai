@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/anthropics/commitlog-ai/internal/model"
+	"github.com/PeterTakahashi/commitlog-ai/internal/model"
 )
 
 // CodexParser reads Codex CLI session logs.

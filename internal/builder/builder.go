@@ -6,12 +6,12 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/anthropics/commitlog-ai/internal/cache"
-	"github.com/anthropics/commitlog-ai/internal/linker"
-	"github.com/anthropics/commitlog-ai/internal/model"
-	"github.com/anthropics/commitlog-ai/internal/parser"
-	"github.com/anthropics/commitlog-ai/internal/sanitizer"
-	"github.com/anthropics/commitlog-ai/internal/userpath"
+	"github.com/PeterTakahashi/commitlog-ai/internal/cache"
+	"github.com/PeterTakahashi/commitlog-ai/internal/linker"
+	"github.com/PeterTakahashi/commitlog-ai/internal/model"
+	"github.com/PeterTakahashi/commitlog-ai/internal/parser"
+	"github.com/PeterTakahashi/commitlog-ai/internal/sanitizer"
+	"github.com/PeterTakahashi/commitlog-ai/internal/userpath"
 )
 
 // Result holds the outcome of a build.
